@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildDefaultHistoryItems,
+  DEFAULT_HISTORY_DISPLAY_LIMIT,
   groupHistoryItemsBySite,
   normalizeUrl,
   parseSearchInput,
@@ -255,4 +257,52 @@ test("groupHistoryItemsBySite falls back to a single all-results group when no s
   assert.equal(groups.length, 1);
   assert.equal(groups[0].title, "全部结果");
   assert.equal(groups[0].count, 3);
+});
+
+test("buildDefaultHistoryItems returns recent items, filters invalid entries and respects limit", () => {
+  const items = [
+    {
+      title: "历史记录",
+      url: "doubao://history/?q=lrm",
+      lastVisitTime: 999
+    },
+    {
+      title: "Keep newest",
+      url: "https://a.example.com/newest",
+      lastVisitTime: 900
+    },
+    {
+      title: "Shared title",
+      url: "https://docs.example.com/a",
+      lastVisitTime: 700
+    },
+    {
+      title: "Shared title",
+      url: "https://docs.example.com/b",
+      lastVisitTime: 800
+    },
+    {
+      title: "Older",
+      url: "https://b.example.com/older",
+      lastVisitTime: 600
+    }
+  ];
+
+  const defaultItems = buildDefaultHistoryItems(items, 2);
+
+  assert.equal(defaultItems.length, 2);
+  assert.equal(defaultItems[0].title, "Keep newest");
+  assert.equal(defaultItems[1].url, "https://docs.example.com/b");
+});
+
+test("buildDefaultHistoryItems uses the shared default display limit", () => {
+  const items = Array.from({ length: DEFAULT_HISTORY_DISPLAY_LIMIT + 5 }, (_, index) => ({
+    title: `Item ${index}`,
+    url: `https://example.com/${index}`,
+    lastVisitTime: DEFAULT_HISTORY_DISPLAY_LIMIT + 5 - index
+  }));
+
+  const defaultItems = buildDefaultHistoryItems(items);
+
+  assert.equal(defaultItems.length, DEFAULT_HISTORY_DISPLAY_LIMIT);
 });

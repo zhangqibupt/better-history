@@ -1,9 +1,18 @@
 import { parseSearchInput } from "../../historySearch.js";
 
+export const DEFAULT_HISTORY_PREFETCH_LIMIT = 50;
 export const PRIMARY_HISTORY_SEARCH_LIMIT = 500;
 export const SUPPLEMENTARY_HISTORY_SEARCH_LIMIT = 1500;
 export const SUPPLEMENTARY_RESULT_THRESHOLD = 20;
 const SUPPLEMENTARY_LOOKBACK_MS = 1000 * 60 * 60 * 24 * 365 * 2;
+
+export function buildDefaultHistoryRequest() {
+  return {
+    text: "",
+    startTime: 0,
+    maxResults: DEFAULT_HISTORY_PREFETCH_LIMIT
+  };
+}
 
 export function buildPrimaryHistorySearchRequest(rawQuery) {
   const { keyword } = parseSearchInput(rawQuery);
@@ -51,6 +60,12 @@ export function mergeHistoryItems(primaryItems, supplementaryItems) {
 }
 
 export async function fetchHistoryItems(rawQuery) {
+  const { keyword, domainFilter } = parseSearchInput(rawQuery);
+
+  if (!keyword && !domainFilter) {
+    return chrome.history.search(buildDefaultHistoryRequest());
+  }
+
   const primaryRequest = buildPrimaryHistorySearchRequest(rawQuery);
   const primaryItems = primaryRequest.text
     ? await chrome.history.search(primaryRequest)

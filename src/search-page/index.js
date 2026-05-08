@@ -1,4 +1,9 @@
-import { groupHistoryItemsBySite, parseSearchInput, searchHistoryItems } from "../historySearch.js";
+import {
+  buildDefaultHistoryItems,
+  groupHistoryItemsBySite,
+  parseSearchInput,
+  searchHistoryItems
+} from "../historySearch.js";
 import { INITIAL_STATUS, LOADING_STATUS, SEARCH_ERROR_STATUS } from "./constants.js";
 import { renderPage } from "./render.js";
 import { fetchHistoryItems } from "./services/historyService.js";
@@ -35,6 +40,23 @@ function buildEmptyStateMessage(query) {
 }
 
 function buildResultState(query, rawItems) {
+  const { keyword, domainFilter } = parseSearchInput(query);
+
+  if (!keyword && !domainFilter) {
+    const defaultItems = buildDefaultHistoryItems(rawItems);
+
+    return {
+      visibleItems: defaultItems,
+      visibleGroups: defaultItems.length > 0 ? groupHistoryItemsBySite(defaultItems) : [],
+      statusMessage:
+        defaultItems.length > 0
+          ? `最近访问的 ${defaultItems.length} 条记录，已按相似图标来源自动聚集排序。`
+          : INITIAL_STATUS,
+      statusTone: "default",
+      resultCount: defaultItems.length
+    };
+  }
+
   const visibleItems = searchHistoryItems(rawItems, query);
 
   if (visibleItems.length === 0) {
@@ -48,7 +70,6 @@ function buildResultState(query, rawItems) {
   }
 
   const visibleGroups = groupHistoryItemsBySite(visibleItems);
-  const primaryGroupCount = visibleGroups.filter((group) => group.title !== "其他结果").length;
   const statusMessage =
     visibleGroups.length > 1
       ? `找到 ${visibleItems.length} 条结果，已按相似图标来源自动聚集排序。`
@@ -86,16 +107,6 @@ function applySearchState(view, rawItems) {
 async function runSearch(view, query) {
   const searchToken = ++activeSearchToken;
   const { keyword, domainFilter } = parseSearchInput(query);
-
-  if (!keyword && !domainFilter) {
-    state.visibleItems = [];
-    state.visibleGroups = [];
-    state.statusMessage = INITIAL_STATUS;
-    state.statusTone = "default";
-    state.resultCount = 0;
-    syncView(view);
-    return;
-  }
 
   state.statusMessage = LOADING_STATUS;
   state.statusTone = "default";
@@ -160,6 +171,7 @@ function init() {
   const view = getView();
   bindEvents(view);
   syncView(view);
+  runSearch(view, state.query);
   view.searchInput.focus();
 }
 

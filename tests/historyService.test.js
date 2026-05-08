@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildDefaultHistoryRequest,
   buildPrimaryHistorySearchRequest,
   buildSupplementaryHistorySearchRequest,
+  DEFAULT_HISTORY_PREFETCH_LIMIT,
   mergeHistoryItems,
   PRIMARY_HISTORY_SEARCH_LIMIT,
   shouldSupplementHistoryResults,
@@ -15,6 +17,14 @@ test("buildPrimaryHistorySearchRequest uses keyword-driven browser recall", () =
     text: "lrm",
     startTime: 0,
     maxResults: PRIMARY_HISTORY_SEARCH_LIMIT
+  });
+});
+
+test("buildDefaultHistoryRequest prefetches recent history for empty query", () => {
+  assert.deepEqual(buildDefaultHistoryRequest(), {
+    text: "",
+    startTime: 0,
+    maxResults: DEFAULT_HISTORY_PREFETCH_LIMIT
   });
 });
 

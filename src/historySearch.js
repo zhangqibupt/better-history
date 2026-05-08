@@ -1,4 +1,5 @@
 export const HISTORY_FETCH_LIMIT = 100000;
+export const DEFAULT_HISTORY_DISPLAY_LIMIT = 20;
 const TITLE_MATCH_PRIORITY = 0;
 const NON_TITLE_MATCH_PRIORITY = 1;
 const OTHER_RESULTS_GROUP_ID = "__other_results__";
@@ -242,6 +243,23 @@ function dedupeByDomainAndTitle(items) {
   return Array.from(uniqueItems.values());
 }
 
+function enrichAndDedupeItems(items, normalizedKeyword) {
+  const matchedItems = [];
+
+  for (const item of items) {
+    const enrichedItem = enrichMatchedItem(item, normalizedKeyword);
+
+    if (!enrichedItem) {
+      continue;
+    }
+
+    matchedItems.push(enrichedItem);
+  }
+
+  const dedupedByUrl = dedupeByNormalizedUrl(matchedItems);
+  return dedupeByDomainAndTitle(dedupedByUrl);
+}
+
 function buildSiteGroups(items) {
   const groups = new Map();
 
@@ -318,6 +336,16 @@ export function groupHistoryItemsBySite(items) {
   return promotedGroups.sort(compareHistoryGroups);
 }
 
+export function buildDefaultHistoryItems(items, limit = DEFAULT_HISTORY_DISPLAY_LIMIT) {
+  const preparedItems = enrichAndDedupeItems(items, "").sort(compareHistoryItems).slice(0, limit);
+
+  if (preparedItems.length === 0) {
+    return [];
+  }
+
+  return groupHistoryItemsBySite(preparedItems).flatMap((group) => group.items);
+}
+
 export function searchHistoryItems(items, query, options = {}) {
   const { keyword, domainFilter } = parseSearchInput(query);
   const activeDomainFilter = normalizeDomainFilter(options.domainFilter || domainFilter);
@@ -342,7 +370,6 @@ export function searchHistoryItems(items, query, options = {}) {
     matchedItems.push(enrichedItem);
   }
 
-  const dedupedByUrl = dedupeByNormalizedUrl(matchedItems);
-  const dedupedByDomainAndTitle = dedupeByDomainAndTitle(dedupedByUrl);
+  const dedupedByDomainAndTitle = dedupeByDomainAndTitle(dedupeByNormalizedUrl(matchedItems));
   return dedupedByDomainAndTitle.sort(compareHistoryItems);
 }
