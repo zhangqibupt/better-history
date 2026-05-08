@@ -1,0 +1,13 @@
+.DS_Store
+node_modules/
+coverage/
+dist/
+build/
+.nyc_output/
+*.log
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.trae/

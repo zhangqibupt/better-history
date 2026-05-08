@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Better Search Bar</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Better Search Bar</p>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <form id="search-form" class="search-form">
+          <label class="search-label" for="search-input">搜索标题、URL</label>
+          <div class="search-row">
+            <input
+              id="search-input"
+              class="search-input"
+              type="search"
+              placeholder="例如：chrome、lrm、site:larkoffice.com"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button class="search-button" type="submit">搜索</button>
+          </div>
+          <p class="search-hint">支持 `site:domain.com` / `domain:domain.com` 定向搜索站点历史。</p>
+        </form>
+
+        <section id="status-card" class="status-card" aria-live="polite"></section>
+        <section id="results-panel" class="results-panel" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <script type="module" src="./index.js"></script>
+  </body>
+</html>

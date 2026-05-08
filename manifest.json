@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Better Search Bar",
+  "version": "1.0.0",
+  "description": "Search browsing history from a dedicated extension page with domain grouping and favicon fallback.",
+  "permissions": ["history", "favicon"],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open Better Search Bar"
+  }
+}
