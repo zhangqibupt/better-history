@@ -75,12 +75,14 @@ function createResultRow(item, keyword, actions) {
 function renderResults(view, state, actions) {
   view.resultsPanel.replaceChildren();
 
-  if (state.visibleItems.length === 0) {
+  if (state.visibleGroups.length === 0) {
     return;
   }
 
   const { keyword } = parseSearchInput(state.query);
-  const rows = state.visibleItems.map((item) => createResultRow(item, keyword, actions));
+  const rows = state.visibleGroups.flatMap((group) =>
+    group.items.map((item) => createResultRow(item, keyword, actions))
+  );
   view.resultsPanel.append(...rows);
 }
 

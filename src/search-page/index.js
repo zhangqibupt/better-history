@@ -1,4 +1,4 @@
-import { parseSearchInput, searchHistoryItems } from "../historySearch.js";
+import { groupHistoryItemsBySite, parseSearchInput, searchHistoryItems } from "../historySearch.js";
 import { INITIAL_STATUS, LOADING_STATUS, SEARCH_ERROR_STATUS } from "./constants.js";
 import { renderPage } from "./render.js";
 import { fetchHistoryItems } from "./services/historyService.js";
@@ -7,6 +7,7 @@ import { openHistoryResult } from "./services/navigationService.js";
 const state = {
   query: "",
   visibleItems: [],
+  visibleGroups: [],
   statusMessage: INITIAL_STATUS,
   statusTone: "default",
   resultCount: 0
@@ -39,16 +40,23 @@ function buildResultState(query, rawItems) {
   if (visibleItems.length === 0) {
     return {
       visibleItems,
+      visibleGroups: [],
       statusMessage: buildEmptyStateMessage(query),
       statusTone: "default",
       resultCount: 0
     };
   }
 
-  const statusMessage = `找到 ${visibleItems.length} 条结果。`;
+  const visibleGroups = groupHistoryItemsBySite(visibleItems);
+  const primaryGroupCount = visibleGroups.filter((group) => group.title !== "其他结果").length;
+  const statusMessage =
+    visibleGroups.length > 1
+      ? `找到 ${visibleItems.length} 条结果，已按相似图标来源自动聚集排序。`
+      : `找到 ${visibleItems.length} 条结果。`;
 
   return {
     visibleItems,
+    visibleGroups,
     statusMessage,
     statusTone: "success",
     resultCount: visibleItems.length
@@ -81,6 +89,7 @@ async function runSearch(view, query) {
 
   if (!keyword && !domainFilter) {
     state.visibleItems = [];
+    state.visibleGroups = [];
     state.statusMessage = INITIAL_STATUS;
     state.statusTone = "default";
     state.resultCount = 0;
@@ -110,6 +119,7 @@ async function runSearch(view, query) {
     state.statusMessage = SEARCH_ERROR_STATUS;
     state.statusTone = "error";
     state.visibleItems = [];
+    state.visibleGroups = [];
     state.resultCount = 0;
     syncView(view);
   }

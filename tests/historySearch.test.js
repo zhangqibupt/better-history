@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  groupHistoryItemsBySite,
   normalizeUrl,
   parseSearchInput,
   searchHistoryItems
@@ -142,4 +143,116 @@ test("searchHistoryItems supports explicit and UI-driven domain filtering", () =
   assert.equal(byUiFilter[0].hostname, "bytedance.larkoffice.com");
   assert.equal(byDomainOnly.length, 2);
   assert.equal(byDomainOnly[0].url, "https://bytedance.larkoffice.com/doc/2");
+});
+
+test("searchHistoryItems excludes internal doubao history links", () => {
+  const items = [
+    {
+      title: "历史记录",
+      url: "doubao://history/?q=lrm",
+      visitCount: 10,
+      lastVisitTime: 100
+    },
+    {
+      title: "LRM kickoff",
+      url: "https://bytedance.larkoffice.com/doc/1",
+      visitCount: 3,
+      lastVisitTime: 10
+    }
+  ];
+
+  const results = searchHistoryItems(items, "lrm");
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].url, "https://bytedance.larkoffice.com/doc/1");
+});
+
+test("groupHistoryItemsBySite promotes frequent hostnames and keeps other results collapsed", () => {
+  const items = [
+    {
+      title: "A1",
+      url: "https://bytedance.sg.larkoffice.com/doc-1",
+      hostname: "bytedance.sg.larkoffice.com",
+      iconGroupKey: "larkoffice.com",
+      iconGroupTitle: "larkoffice",
+      visitCount: 8,
+      lastVisitTime: 50
+    },
+    {
+      title: "A2",
+      url: "https://bytedance.larkoffice.com/doc-2",
+      hostname: "bytedance.larkoffice.com",
+      iconGroupKey: "larkoffice.com",
+      iconGroupTitle: "larkoffice",
+      visitCount: 7,
+      lastVisitTime: 40
+    },
+    {
+      title: "B1",
+      url: "https://cloud.bytedance.net/doc-1",
+      hostname: "cloud.bytedance.net",
+      iconGroupKey: "bytedance.net",
+      iconGroupTitle: "bytedance",
+      visitCount: 6,
+      lastVisitTime: 30
+    },
+    {
+      title: "B2",
+      url: "https://cloud-ttp-us.bytedance.net/doc-2",
+      hostname: "cloud-ttp-us.bytedance.net",
+      iconGroupKey: "bytedance.net",
+      iconGroupTitle: "bytedance",
+      visitCount: 5,
+      lastVisitTime: 20
+    },
+    {
+      title: "C1",
+      url: "https://c.example.com/doc-1",
+      hostname: "c.example.com",
+      visitCount: 4,
+      lastVisitTime: 10
+    }
+  ];
+
+  const groups = groupHistoryItemsBySite(items);
+
+  assert.equal(groups.length, 3);
+  assert.equal(groups[0].title, "larkoffice");
+  assert.equal(groups[0].count, 2);
+  assert.equal(groups[1].title, "bytedance");
+  assert.equal(groups[2].title, "其他结果");
+  assert.equal(groups[2].count, 1);
+  assert.equal(groups[2].items[0].hostname, "c.example.com");
+});
+
+test("groupHistoryItemsBySite falls back to a single all-results group when no site is dominant", () => {
+  const items = [
+    {
+      title: "A1",
+      url: "https://a.example.com/doc-1",
+      hostname: "a.example.com",
+      visitCount: 8,
+      lastVisitTime: 50
+    },
+    {
+      title: "B1",
+      url: "https://b.example.com/doc-1",
+      hostname: "b.example.com",
+      visitCount: 7,
+      lastVisitTime: 40
+    },
+    {
+      title: "C1",
+      url: "https://c.example.com/doc-1",
+      hostname: "c.example.com",
+      visitCount: 6,
+      lastVisitTime: 30
+    }
+  ];
+
+  const groups = groupHistoryItemsBySite(items);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].title, "全部结果");
+  assert.equal(groups[0].count, 3);
 });
