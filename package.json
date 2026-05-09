@@ -1,8 +1,24 @@
 {
-  "name": "better-search-bar",
+  "name": "better-history",
   "version": "1.0.0",
-  "private": true,
-  "description": "Chrome MV3 dedicated history search page extension",
+  "description": "Keyboard-first Chrome MV3 history search extension with grouped results and quick filters",
+  "license": "MIT",
+  "author": "Zhang Qi",
+  "homepage": "https://github.com/zhangqibupt/better-history",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhangqibupt/better-history.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zhangqibupt/better-history/issues"
+  },
+  "keywords": [
+    "chrome-extension",
+    "manifest-v3",
+    "history-search",
+    "browser-history",
+    "productivity"
+  ],
   "type": "module",
   "scripts": {
     "test": "node --test"
