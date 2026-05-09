@@ -14,3 +14,13 @@ chrome.action.onClicked.addListener(() => {
     console.error("Failed to open Better History page.", { error });
   });
 });
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== "open-search-page") {
+    return;
+  }
+
+  openSearchPage().catch((error) => {
+    console.error("Failed to open Better History page from command.", { error, command });
+  });
+});

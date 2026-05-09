@@ -21,5 +21,14 @@
       "48": "assets/icon-48.png"
     },
     "default_title": "Open Better History"
+  },
+  "commands": {
+    "open-search-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
+      },
+      "description": "Open Better History search page"
+    }
   }
 }
