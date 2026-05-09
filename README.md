@@ -6,6 +6,10 @@
 
 它不走浏览器原生历史页，也不依赖 `omnibox` 关键词模式，而是提供一个独立的命令面板式历史搜索页：默认展示最近访问记录；输入关键词后，再按站点 icon 来源自动聚集结果，配合键盘导航、快速筛选和稳定焦点管理，尽量把“找回刚看过的页面”这件事做得更快。
 
+## Demo
+
+![Better History demo](docs/demo.png)
+
 ## Why Better History
 
 浏览器自带历史页能查到内容，但不一定适合高频检索。这个项目更关注下面几件事：
@@ -144,7 +148,7 @@ npm test
 
 - 补齐 `LICENSE`、`CONTRIBUTING.md`、`CHANGELOG.md`
 - 补齐 GitHub Issue / PR 模板与最小 CI
-- 增加更适合 GitHub 首页展示的截图或演示 GIF
+- 增加更多适合 GitHub 首页展示的截图或演示 GIF
 - 继续优化 README、About 和 Topics，使仓库表达更适合公开开源传播
 
 ## 参与贡献

@@ -9,6 +9,7 @@
 ### Added
 - 初始化开源仓库基础文档，包括 `README.md`、`LICENSE`、`CONTRIBUTING.md` 和 `CHANGELOG.md`
 - 为 `package.json` 补齐更接近公共 npm 项目的元信息，包括 `license`、`author`、`homepage`、`repository`、`bugs` 与 `keywords`
+- 新增可直接在 GitHub README 中展示的 demo 截图 `docs/demo.png`
 
 ### Changed
 - 移除 `package.json` 中的 `"private": true`，使仓库配置更接近标准公共 npm 项目
