@@ -38,9 +38,11 @@
 - 结果区会固定显示轻量头部，用 `最近访问 / 搜索结果 + 条数` 建立上下文
 - 支持键盘结果导航：`ArrowUp` / `ArrowDown` 选择，`Enter` 当前页打开，`Shift+Enter` 新标签打开
 - 支持 `Ctrl + 数字键` 快速切换站点筛选；按住 `Ctrl` 时会临时显示数字提示，不影响 chip 宽度
+- 键盘选中切换与 `Ctrl` 快捷提示优先使用局部 DOM 更新，减少连续操作时的整表重绘
 - 鼠标点击结果不会抢走输入框焦点；切回搜索页时输入框会自动恢复焦点
 - 图标优先使用 Chrome 官方 `_favicon` 能力，失败时回退到稳定占位图标
 - 在召回阶段和结果整理阶段双重过滤 `doubao://history`、`chrome://*`、`chrome-extension://*`，以及 `extensions?id=...` 这类无协议内部页结果，避免污染搜索结果
+- 对相同查询结果和补召回批次做短时缓存，减少连续输入时的重复历史查询
 
 ## 交互亮点
 
@@ -133,14 +135,15 @@ npm test
 - 键盘选择索引边界
 - 当前标签页 / 新标签页两种打开路径
 
-如果你在排查内部页过滤问题，可打开扩展页 DevTools，在 Console 中查看：
+如果你在排查内部页过滤问题，可打开扩展页 DevTools，在 Console 中按下面顺序操作：
 
 ```js
+window.__BETTER_HISTORY_DEBUG_ENABLED__ = true
 window.__BETTER_HISTORY_BUILD__
 window.__BETTER_HISTORY_DEBUG__
 ```
 
-其中 `__BETTER_HISTORY_DEBUG__` 会包含最近一次搜索的原始结果数、过滤后结果数，以及被剔除项的 `title/url` 快照。
+其中 `__BETTER_HISTORY_DEBUG__` 会在显式开启 `__BETTER_HISTORY_DEBUG_ENABLED__` 后，包含最近一次搜索的原始结果数、过滤后结果数，以及被剔除项的 `title/url` 快照。默认不开启，避免在正常搜索路径里持续构造调试日志。
 
 如果你修改了扩展源码但浏览器页面仍表现异常，请回到扩展管理页重新加载该扩展，再重新打开搜索页，避免继续运行旧缓存脚本。
 
@@ -152,6 +155,7 @@ window.__BETTER_HISTORY_DEBUG__
 - 扩展也通过 `commands` 提供快捷键入口，两种入口并存
 - 当前不再支持 `hs <keyword>` 这类地址栏模式
 - 搜索优先使用 `chrome.history.search(query)` 做原生粗召回；多词搜索时会优先用最长 token 做主召回，再配合受控补召回和本地 AND 过滤
+- 为了降低连续输入时的重复 IO，相同查询结果与补召回批次会做短时缓存，但不会改变既有过滤、分组和排序规则
 - 搜索结果会在历史召回后立即剔除浏览器内部页与扩展页，例如 `chrome://newtab/`、`chrome://extensions/`、扩展自身页面，以及部分浏览器历史里以 `extensions?id=...` 形式出现的无协议内部页
 - 结果图标优先复用 `_favicon`，若不可用则回退到稳定的首字母占位图标
 - 当前界面优先追求高密度检索体验，因此分组默认自动展开，不引入额外视图切换

@@ -41,7 +41,7 @@ function applyFavicon(image, item) {
   );
 }
 
-function renderResultsSummary(view, state) {
+export function renderResultsSummary(view, state) {
   const { keyword, domainFilter } = parseSearchInput(state.query);
   const hasSearchQuery = Boolean(keyword || domainFilter);
 
@@ -92,7 +92,7 @@ function createQuickFilterButton(filter, actions, isActive, showShortcut) {
   return button;
 }
 
-function renderQuickFilters(view, state, actions) {
+export function renderQuickFilters(view, state, actions) {
   view.quickFiltersPanel.replaceChildren();
 
   if (state.quickFilters.length === 0) {
@@ -167,7 +167,7 @@ function renderDomainPriorityList(view, state, actions) {
   view.domainPriorityList.append(...listItems);
 }
 
-function renderSettingsDialog(view, state, actions) {
+export function renderSettingsDialog(view, state, actions) {
   view.settingsDialog.hidden = !state.settingsDialogOpen;
   view.settingsButton.setAttribute("aria-expanded", state.settingsDialogOpen ? "true" : "false");
   view.domainPriorityFeedback.textContent = state.settingsFeedback.message;
@@ -188,7 +188,7 @@ function createResultUrl(item, keyword) {
   return resultUrl;
 }
 
-function getResultRowId(index) {
+export function getResultRowId(index) {
   return `result-option-${index}`;
 }
 
@@ -221,7 +221,7 @@ function createResultRow(item, keyword, actions, index, isSelected) {
   return button;
 }
 
-function renderResults(view, state, actions) {
+export function renderResults(view, state, actions) {
   view.resultsPanel.replaceChildren();
   view.resultsPanel.setAttribute("role", "listbox");
   view.resultsPanel.setAttribute("aria-label", "搜索结果");

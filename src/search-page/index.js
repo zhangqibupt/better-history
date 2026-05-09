@@ -5,7 +5,7 @@ import {
   parseSearchInput,
   searchHistoryItems
 } from "../historySearch.js";
-import { renderPage } from "./render.js";
+import { getResultRowId, renderPage, renderQuickFilters } from "./render.js";
 import { fetchHistoryItems } from "./services/historyService.js";
 import { openHistoryResult } from "./services/navigationService.js";
 import { reorderGroupsByDomainPriority, validateDomainPriority } from "./services/domainPriorityService.js";
@@ -215,6 +215,65 @@ function scrollSelectedRowIntoView(view) {
   }
 }
 
+function setResultRowSelectionState(row, isSelected) {
+  if (!row) {
+    return;
+  }
+
+  row.dataset.selected = isSelected ? "true" : "false";
+  row.setAttribute("aria-selected", isSelected ? "true" : "false");
+}
+
+function updateSelectedResultRow(view, previousIndex, nextIndex) {
+  if (view.resultsPanel.childElementCount !== state.resultCount) {
+    return false;
+  }
+
+  const previousRow =
+    previousIndex === NO_SELECTION ? null : document.getElementById(getResultRowId(previousIndex));
+  const nextRow =
+    nextIndex === NO_SELECTION ? null : document.getElementById(getResultRowId(nextIndex));
+
+  if (previousIndex !== NO_SELECTION && !previousRow) {
+    return false;
+  }
+
+  if (nextIndex !== NO_SELECTION && !nextRow) {
+    return false;
+  }
+
+  setResultRowSelectionState(previousRow, false);
+  setResultRowSelectionState(nextRow, true);
+
+  if (nextIndex === NO_SELECTION) {
+    view.resultsPanel.removeAttribute("aria-activedescendant");
+    return true;
+  }
+
+  view.resultsPanel.setAttribute("aria-activedescendant", getResultRowId(nextIndex));
+  return true;
+}
+
+function updateSelectedIndex(view, nextIndex, options = {}) {
+  if (state.selectedIndex === nextIndex) {
+    return;
+  }
+
+  const previousIndex = state.selectedIndex;
+  state.selectedIndex = nextIndex;
+
+  if (!updateSelectedResultRow(view, previousIndex, nextIndex)) {
+    syncView(view, options);
+    return;
+  }
+
+  if (options.scrollSelectionIntoView) {
+    requestAnimationFrame(() => {
+      scrollSelectedRowIntoView(view);
+    });
+  }
+}
+
 async function performOpenResult(url, options) {
   try {
     await openHistoryResult(url, options);
@@ -352,11 +411,11 @@ function setQuickFilterShortcutVisibility(view, isVisible) {
   }
 
   state.showQuickFilterShortcuts = isVisible;
-  syncView(view);
+  renderQuickFilters(view, state, buildRenderActions(view));
 }
 
-function syncView(view, options = {}) {
-  renderPage(view, state, {
+function buildRenderActions(view) {
+  return {
     onOpenSettings() {
       openSettingsDialog(view);
     },
@@ -399,11 +458,14 @@ function syncView(view, options = {}) {
       focusSearchInput(view, { moveCaretToEnd: true });
     },
     async onOpenResult(index, url) {
-      state.selectedIndex = index;
-      syncView(view);
+      updateSelectedIndex(view, index);
       await performOpenResult(url, { openInNewTab: true });
     }
-  });
+  };
+}
+
+function syncView(view, options = {}) {
+  renderPage(view, state, buildRenderActions(view));
 
   if (options.scrollSelectionIntoView) {
     requestAnimationFrame(() => {
@@ -419,10 +481,6 @@ function applySearchState(view, rawItems) {
 
 async function runSearch(view, query) {
   const searchToken = ++activeSearchToken;
-
-  state.resultCount = 0;
-  state.selectedIndex = NO_SELECTION;
-  syncView(view);
 
   try {
     const rawItems = await fetchHistoryItems(query);
@@ -504,12 +562,15 @@ async function handleSearchInputKeydown(view, event) {
     }
 
     event.preventDefault();
-    state.selectedIndex = moveSelectionIndex(
+    updateSelectedIndex(
+      view,
+      moveSelectionIndex(
       state.selectedIndex,
       renderedItems.length,
       event.key === "ArrowDown" ? 1 : -1
+      ),
+      { scrollSelectionIntoView: true }
     );
-    syncView(view, { scrollSelectionIntoView: true });
     return;
   }
 

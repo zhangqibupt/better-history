@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
 import {
@@ -7,11 +7,19 @@ import {
   buildSupplementaryHistorySearchRequest,
   DEFAULT_HISTORY_PREFETCH_LIMIT,
   fetchHistoryItems,
+  HISTORY_DEBUG_FLAG,
   mergeHistoryItems,
   PRIMARY_HISTORY_SEARCH_LIMIT,
+  resetHistoryServiceCaches,
   shouldSupplementHistoryResults,
   SUPPLEMENTARY_HISTORY_SEARCH_LIMIT
 } from "../src/search-page/services/historyService.js";
+
+beforeEach(() => {
+  resetHistoryServiceCaches();
+  delete globalThis.chrome;
+  delete globalThis[HISTORY_DEBUG_FLAG];
+});
 
 test("buildPrimaryHistorySearchRequest uses keyword-driven browser recall", () => {
   assert.deepEqual(buildPrimaryHistorySearchRequest("lrm site:larkoffice.com"), {
@@ -144,4 +152,67 @@ test("fetchHistoryItems filters scheme-less internal urls from browser history",
 
   assert.equal(items.length, 1);
   assert.equal(items[0].url, "https://example.com/wiki");
+});
+
+test("fetchHistoryItems reuses cached results for the same query", async () => {
+  let callCount = 0;
+
+  globalThis.chrome = {
+    history: {
+      async search() {
+        callCount += 1;
+        return [{ title: "Team wiki", url: "https://example.com/wiki" }];
+      }
+    }
+  };
+
+  const firstItems = await fetchHistoryItems("");
+  const secondItems = await fetchHistoryItems("");
+
+  assert.equal(callCount, 1);
+  assert.equal(firstItems[0].url, "https://example.com/wiki");
+  assert.equal(secondItems[0].url, "https://example.com/wiki");
+});
+
+test("fetchHistoryItems reuses supplementary recall across different queries", async () => {
+  const requests = [];
+
+  globalThis.chrome = {
+    history: {
+      async search(request) {
+        requests.push(request);
+
+        if (request.text) {
+          return [{ title: `${request.text} doc`, url: `https://example.com/${request.text}` }];
+        }
+
+        return [{ title: "Shared fallback doc", url: "https://example.com/shared-fallback" }];
+      }
+    }
+  };
+
+  await fetchHistoryItems("alpha beta");
+  await fetchHistoryItems("gamma delta");
+
+  assert.equal(requests.filter((request) => request.text === "").length, 1);
+  assert.equal(requests.filter((request) => request.text !== "").length, 2);
+});
+
+test("fetchHistoryItems only publishes debug payload when explicitly enabled", async () => {
+  globalThis.chrome = {
+    history: {
+      async search() {
+        return [{ title: "Team wiki", url: "https://example.com/wiki" }];
+      }
+    }
+  };
+
+  await fetchHistoryItems("");
+  assert.equal(globalThis.__BETTER_HISTORY_DEBUG__, undefined);
+
+  globalThis[HISTORY_DEBUG_FLAG] = true;
+  await fetchHistoryItems("wiki");
+
+  assert.equal(globalThis.__BETTER_HISTORY_DEBUG__.filteredCount, 1);
+  assert.equal(globalThis.__BETTER_HISTORY_DEBUG__.keptItems[0].url, "https://example.com/wiki");
 });
