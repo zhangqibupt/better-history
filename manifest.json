@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Better Search Bar",
+  "name": "Better History",
   "version": "1.0.0",
   "description": "Search browsing history from a dedicated extension page with domain grouping and favicon fallback.",
   "permissions": ["history", "favicon"],
@@ -9,6 +9,6 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Open Better Search Bar"
+    "default_title": "Open Better History"
   }
 }

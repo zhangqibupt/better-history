@@ -53,12 +53,26 @@ function createResultUrl(item, keyword) {
   return resultUrl;
 }
 
-function createResultRow(item, keyword, actions) {
+function getResultRowId(index) {
+  return `result-option-${index}`;
+}
+
+function createResultRow(item, keyword, actions, index, isSelected) {
   const button = createElement("button", "result-row");
   button.type = "button";
+  button.id = getResultRowId(index);
+  button.setAttribute("role", "option");
+  button.setAttribute("aria-selected", isSelected ? "true" : "false");
+  button.setAttribute("aria-label", `${item.title?.trim() || "Untitled page"} ${item.url || ""}`);
+  button.dataset.selected = isSelected ? "true" : "false";
+  button.tabIndex = -1;
   button.title = `${item.title?.trim() || "Untitled page"}\n${item.url || ""}`;
+  button.addEventListener("mousedown", (event) => {
+    // Keep the search input focused while still allowing mouse click to open the result.
+    event.preventDefault();
+  });
   button.addEventListener("click", () => {
-    actions.onOpenResult(item.url);
+    actions.onOpenResult(index, item.url);
   });
 
   const icon = createElement("img", "result-icon");
@@ -74,15 +88,29 @@ function createResultRow(item, keyword, actions) {
 
 function renderResults(view, state, actions) {
   view.resultsPanel.replaceChildren();
+  view.resultsPanel.setAttribute("role", "listbox");
+  view.resultsPanel.setAttribute("aria-label", "搜索结果");
 
   if (state.visibleGroups.length === 0) {
+    view.resultsPanel.removeAttribute("aria-activedescendant");
     return;
   }
 
   const { keyword } = parseSearchInput(state.query);
+  let rowIndex = 0;
   const rows = state.visibleGroups.flatMap((group) =>
-    group.items.map((item) => createResultRow(item, keyword, actions))
+    group.items.map((item) => {
+      const currentIndex = rowIndex++;
+      return createResultRow(item, keyword, actions, currentIndex, currentIndex === state.selectedIndex);
+    })
   );
+
+  if (state.selectedIndex >= 0) {
+    view.resultsPanel.setAttribute("aria-activedescendant", getResultRowId(state.selectedIndex));
+  } else {
+    view.resultsPanel.removeAttribute("aria-activedescendant");
+  }
+
   view.resultsPanel.append(...rows);
 }
 
