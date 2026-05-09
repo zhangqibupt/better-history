@@ -265,6 +265,28 @@ button {
   border: 0;
 }
 
+.settings-button {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text-secondary);
+  font-weight: 600;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.settings-button:hover,
+.settings-button:focus-visible {
+  outline: none;
+  background: #fff;
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
 .search-button {
   min-width: 112px;
   min-height: 48px;
@@ -357,6 +379,283 @@ button {
   gap: 8px;
   align-items: center;
   padding: 2px 2px 0;
+}
+
+.settings-dialog[hidden] {
+  display: none;
+}
+
+.settings-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding: 18px;
+  background: rgba(17, 24, 39, 0.42);
+  backdrop-filter: blur(10px);
+}
+
+.settings-surface {
+  width: min(720px, calc(100vw - 36px));
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.22);
+  overflow: hidden;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(249, 250, 251, 0.92);
+}
+
+.settings-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.settings-close-button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.settings-close-button:hover,
+.settings-close-button:focus-visible {
+  outline: none;
+  border-color: var(--border-default);
+  background: #fff;
+  color: var(--text-primary);
+}
+
+.settings-body {
+  padding: 16px;
+}
+
+.settings-section {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.settings-section-copy {
+  margin: 4px 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-form {
+  margin: 0;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-field-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.settings-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.92);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.settings-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+}
+
+.settings-action-button,
+.settings-secondary-button,
+.settings-primary-button {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-weight: 650;
+}
+
+.settings-action-button {
+  border: 1px solid rgba(79, 70, 229, 0.18);
+  background: rgba(79, 70, 229, 0.06);
+  color: var(--accent-strong);
+}
+
+.settings-action-button:hover,
+.settings-action-button:focus-visible {
+  outline: none;
+  border-color: rgba(79, 70, 229, 0.28);
+  background: rgba(79, 70, 229, 0.09);
+}
+
+.settings-feedback {
+  margin: 0;
+  min-height: 18px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.settings-feedback[data-tone="error"] {
+  color: #b91c1c;
+}
+
+.settings-feedback[data-tone="success"] {
+  color: #047857;
+}
+
+.settings-list-wrap {
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(248, 250, 252, 0.76);
+}
+
+.settings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-list-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-list-item:last-child {
+  border-bottom: 0;
+}
+
+.settings-list-domain {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-list-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-list-button {
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.settings-list-button:hover,
+.settings-list-button:focus-visible {
+  outline: none;
+  border-color: var(--border-default);
+  background: #fff;
+  color: var(--text-primary);
+}
+
+.settings-list-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--border-subtle);
+  background: rgba(249, 250, 251, 0.92);
+}
+
+.settings-secondary-button {
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text-secondary);
+}
+
+.settings-secondary-button:hover,
+.settings-secondary-button:focus-visible {
+  outline: none;
+  border-color: var(--border-default);
+  background: #fff;
+  color: var(--text-primary);
+}
+
+.settings-primary-button {
+  border: 0;
+  background: #111827;
+  color: #fff;
+}
+
+.settings-primary-button:hover,
+.settings-primary-button:focus-visible {
+  outline: none;
+  background: #030712;
 }
 
 .quick-filter-button {
@@ -616,6 +915,20 @@ mark {
 
   .search-button {
     width: 100%;
+  }
+
+  .settings-button {
+    width: 100%;
+  }
+
+  .settings-field-row,
+  .settings-footer,
+  .settings-list-item {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-list-actions {
+    justify-content: flex-start;
   }
 
   .search-hints {

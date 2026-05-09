@@ -115,6 +115,72 @@ function renderQuickFilters(view, state, actions) {
   view.quickFiltersPanel.append(...buttons);
 }
 
+function createSettingsListButton(label, ariaLabel, isDisabled, onClick) {
+  const button = createElement("button", "settings-list-button");
+  button.type = "button";
+  button.textContent = label;
+  button.setAttribute("aria-label", ariaLabel);
+  button.disabled = isDisabled;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function renderDomainPriorityList(view, state, actions) {
+  view.domainPriorityList.replaceChildren();
+
+  if (state.draftSettings.domainPriorities.length === 0) {
+    const emptyItem = createElement("li", "settings-list-item");
+    const emptyText = createElement("span", "settings-list-domain");
+    emptyText.textContent = "还没有优先域名，添加后会用于搜索分组重排。";
+    emptyItem.append(emptyText);
+    view.domainPriorityList.append(emptyItem);
+    return;
+  }
+
+  const listItems = state.draftSettings.domainPriorities.map((domain, index) => {
+    const item = createElement("li", "settings-list-item");
+    const label = createElement("span", "settings-list-domain");
+    const actionsWrap = createElement("div", "settings-list-actions");
+    label.textContent = domain;
+
+    actionsWrap.append(
+      createSettingsListButton("↑", `上移 ${domain}`, index === 0, () => {
+        actions.onMoveDomainPriorityUp(index);
+      }),
+      createSettingsListButton(
+        "↓",
+        `下移 ${domain}`,
+        index === state.draftSettings.domainPriorities.length - 1,
+        () => {
+          actions.onMoveDomainPriorityDown(index);
+        }
+      ),
+      createSettingsListButton("删", `删除 ${domain}`, false, () => {
+        actions.onRemoveDomainPriority(index);
+      })
+    );
+
+    item.append(label, actionsWrap);
+    return item;
+  });
+
+  view.domainPriorityList.append(...listItems);
+}
+
+function renderSettingsDialog(view, state, actions) {
+  view.settingsDialog.hidden = !state.settingsDialogOpen;
+  view.settingsButton.setAttribute("aria-expanded", state.settingsDialogOpen ? "true" : "false");
+  view.domainPriorityFeedback.textContent = state.settingsFeedback.message;
+
+  if (state.settingsFeedback.tone) {
+    view.domainPriorityFeedback.dataset.tone = state.settingsFeedback.tone;
+  } else {
+    delete view.domainPriorityFeedback.dataset.tone;
+  }
+
+  renderDomainPriorityList(view, state, actions);
+}
+
 function createResultUrl(item, keyword) {
   const resultUrl = createElement("span", "result-url");
   appendHighlightedText(resultUrl, formatDisplayUrl(item.url), keyword);
@@ -185,6 +251,7 @@ function renderResults(view, state, actions) {
 
 export function renderPage(view, state, actions) {
   renderResultsSummary(view, state);
+  renderSettingsDialog(view, state, actions);
   renderQuickFilters(view, state, actions);
   renderResults(view, state, actions);
 }

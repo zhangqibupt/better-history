@@ -9,6 +9,7 @@ import {
   parseSearchInput,
   searchHistoryItems
 } from "../src/historySearch.js";
+import { reorderGroupsByDomainPriority } from "../src/search-page/services/domainPriorityService.js";
 
 test("normalizeUrl removes hash while keeping query parameters", () => {
   assert.equal(
@@ -257,6 +258,62 @@ test("groupHistoryItemsBySite falls back to a single all-results group when no s
   assert.equal(groups.length, 1);
   assert.equal(groups[0].title, "全部结果");
   assert.equal(groups[0].count, 3);
+});
+
+test("groupHistoryItemsBySite promotes prioritized domains even when they do not meet the default threshold", () => {
+  const items = [
+    {
+      title: "Aeolus",
+      url: "https://aeolus-va.tiktok-row.net/pages/dataQuery?appId=1",
+      hostname: "aeolus-va.tiktok-row.net",
+      iconGroupKey: "tiktok-row.net",
+      iconGroupTitle: "tiktok-row",
+      visitCount: 3,
+      lastVisitTime: 100
+    },
+    {
+      title: "Lark 1",
+      url: "https://foo.larkoffice.com/doc-1",
+      hostname: "foo.larkoffice.com",
+      iconGroupKey: "larkoffice.com",
+      iconGroupTitle: "larkoffice",
+      visitCount: 9,
+      lastVisitTime: 90
+    },
+    {
+      title: "Lark 2",
+      url: "https://bar.larkoffice.com/doc-2",
+      hostname: "bar.larkoffice.com",
+      iconGroupKey: "larkoffice.com",
+      iconGroupTitle: "larkoffice",
+      visitCount: 8,
+      lastVisitTime: 80
+    },
+    {
+      title: "Example 1",
+      url: "https://example.com/doc-1",
+      hostname: "example.com",
+      iconGroupKey: "example.com",
+      iconGroupTitle: "example",
+      visitCount: 7,
+      lastVisitTime: 70
+    }
+  ];
+
+  const groups = groupHistoryItemsBySite(items, {
+    domainPriorities: ["tiktok-row.net"]
+  });
+
+  assert.equal(groups.length, 3);
+  assert.equal(groups.some((group) => group.id === "tiktok-row.net"), true);
+  assert.equal(groups.some((group) => group.title === "其他结果"), true);
+
+  const reorderedGroups = reorderGroupsByDomainPriority(groups, ["tiktok-row.net"]);
+
+  assert.equal(reorderedGroups[0].id, "tiktok-row.net");
+  assert.equal(reorderedGroups[0].count, 1);
+  assert.equal(reorderedGroups[1].id, "larkoffice.com");
+  assert.equal(reorderedGroups[2].title, "其他结果");
 });
 
 test("buildDefaultHistoryItems keeps latest unique items and sorts by last visit time", () => {

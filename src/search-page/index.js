@@ -8,12 +8,14 @@ import {
 import { renderPage } from "./render.js";
 import { fetchHistoryItems } from "./services/historyService.js";
 import { openHistoryResult } from "./services/navigationService.js";
+import { reorderGroupsByDomainPriority, validateDomainPriority } from "./services/domainPriorityService.js";
 import {
   buildQuickFilters,
   filterGroupsByActiveFilterId,
   getQuickFilterByShortcut,
   resolveActiveQuickFilterId
 } from "./services/quickFilterService.js";
+import { DEFAULT_SETTINGS, loadSearchPageSettings, saveSearchPageSettings } from "./services/settingsService.js";
 import {
   NO_SELECTION,
   getDefaultSelectionIndex,
@@ -28,6 +30,13 @@ const state = {
   quickFilters: [],
   showQuickFilterShortcuts: false,
   activeFilterId: "",
+  settings: { ...DEFAULT_SETTINGS },
+  draftSettings: { ...DEFAULT_SETTINGS },
+  settingsDialogOpen: false,
+  settingsFeedback: {
+    tone: "",
+    message: ""
+  },
   resultCount: 0,
   selectedIndex: NO_SELECTION
 };
@@ -38,6 +47,15 @@ function getView() {
   return {
     searchForm: document.querySelector("#search-form"),
     searchInput: document.querySelector("#search-input"),
+    settingsButton: document.querySelector("#settings-button"),
+    settingsDialog: document.querySelector("#settings-dialog"),
+    settingsCloseButton: document.querySelector("#settings-close-button"),
+    settingsSaveButton: document.querySelector("#settings-save-button"),
+    settingsResetButton: document.querySelector("#settings-reset-button"),
+    domainPriorityForm: document.querySelector("#domain-priority-form"),
+    domainPriorityInput: document.querySelector("#domain-priority-input"),
+    domainPriorityFeedback: document.querySelector("#domain-priority-feedback"),
+    domainPriorityList: document.querySelector("#domain-priority-list"),
     quickFiltersPanel: document.querySelector("#quick-filters-panel"),
     resultsPanel: document.querySelector("#results-panel"),
     resultsTitle: document.querySelector("#results-title"),
@@ -49,15 +67,16 @@ function getVisibleItemCount(groups) {
   return groups.reduce((count, group) => count + group.items.length, 0);
 }
 
-function buildGroupedState(items, groups, previousFilterId) {
-  const quickFilters = buildQuickFilters(groups, items);
+function buildGroupedState(items, groups, previousFilterId, prioritizedDomains) {
+  const orderedGroups = reorderGroupsByDomainPriority(groups, prioritizedDomains);
+  const quickFilters = buildQuickFilters(orderedGroups, items);
   const activeFilterId = resolveActiveQuickFilterId(previousFilterId, quickFilters);
-  const visibleGroups = filterGroupsByActiveFilterId(groups, activeFilterId);
+  const visibleGroups = filterGroupsByActiveFilterId(orderedGroups, activeFilterId);
   const visibleItemCount = getVisibleItemCount(visibleGroups);
 
   return {
     visibleItems: items,
-    allGroups: groups,
+    allGroups: orderedGroups,
     visibleGroups,
     quickFilters,
     activeFilterId,
@@ -90,7 +109,7 @@ function buildUngroupedState(items) {
   };
 }
 
-function buildResultState(query, rawItems, previousFilterId = "") {
+function buildResultState(query, rawItems, previousFilterId = "", settings = DEFAULT_SETTINGS) {
   const { keyword, domainFilter } = parseSearchInput(query);
 
   if (!keyword && !domainFilter) {
@@ -125,7 +144,14 @@ function buildResultState(query, rawItems, previousFilterId = "") {
     };
   }
 
-  return buildGroupedState(visibleItems, groupHistoryItemsBySite(visibleItems), previousFilterId);
+  return buildGroupedState(
+    visibleItems,
+    groupHistoryItemsBySite(visibleItems, {
+      domainPriorities: settings.domainPriorities
+    }),
+    previousFilterId,
+    settings.domainPriorities
+  );
 }
 
 function getRenderedItems() {
@@ -150,6 +176,14 @@ function focusSearchInput(view, options = {}) {
 
   const caretIndex = view.searchInput.value.length;
   view.searchInput.setSelectionRange(caretIndex, caretIndex);
+}
+
+function focusDomainPriorityInput(view) {
+  if (!state.settingsDialogOpen || !view.domainPriorityInput) {
+    return;
+  }
+
+  view.domainPriorityInput.focus({ preventScroll: true });
 }
 
 function scrollSelectedRowIntoView(view) {
@@ -188,6 +222,111 @@ async function performOpenResult(url, options) {
   }
 }
 
+function setSettingsFeedback(tone, message) {
+  state.settingsFeedback = { tone, message };
+}
+
+function replaceDraftSettings(nextDraftSettings) {
+  state.draftSettings = {
+    ...DEFAULT_SETTINGS,
+    ...nextDraftSettings
+  };
+}
+
+function openSettingsDialog(view) {
+  replaceDraftSettings(state.settings);
+  state.settingsDialogOpen = true;
+  setSettingsFeedback("", "");
+  if (view.domainPriorityInput) {
+    view.domainPriorityInput.value = "";
+  }
+  syncView(view);
+  requestAnimationFrame(() => {
+    focusDomainPriorityInput(view);
+  });
+}
+
+function closeSettingsDialog(view, options = {}) {
+  state.settingsDialogOpen = false;
+  setSettingsFeedback("", "");
+  if (view.domainPriorityInput) {
+    view.domainPriorityInput.value = "";
+  }
+  syncView(view);
+  requestAnimationFrame(() => {
+    if (options.restoreFocusToSettingsButton) {
+      view.settingsButton?.focus({ preventScroll: true });
+      return;
+    }
+
+    focusSearchInput(view, { moveCaretToEnd: true });
+  });
+}
+
+function moveDraftDomainPriority(fromIndex, toIndex) {
+  const nextDomainPriorities = [...state.draftSettings.domainPriorities];
+  const [movedDomain] = nextDomainPriorities.splice(fromIndex, 1);
+
+  if (!movedDomain) {
+    return;
+  }
+
+  nextDomainPriorities.splice(toIndex, 0, movedDomain);
+  replaceDraftSettings({
+    ...state.draftSettings,
+    domainPriorities: nextDomainPriorities
+  });
+}
+
+function removeDraftDomainPriority(index) {
+  replaceDraftSettings({
+    ...state.draftSettings,
+    domainPriorities: state.draftSettings.domainPriorities.filter((_, currentIndex) => currentIndex !== index)
+  });
+}
+
+function addDraftDomainPriority(view) {
+  const validation = validateDomainPriority(
+    view.domainPriorityInput?.value ?? "",
+    state.draftSettings.domainPriorities
+  );
+
+  if (!validation.isValid) {
+    setSettingsFeedback("error", validation.message);
+    syncView(view);
+    focusDomainPriorityInput(view);
+    return;
+  }
+
+  replaceDraftSettings({
+    ...state.draftSettings,
+    domainPriorities: [...state.draftSettings.domainPriorities, validation.normalizedDomain]
+  });
+  setSettingsFeedback("success", `已添加 ${validation.normalizedDomain}`);
+  syncView(view);
+
+  if (view.domainPriorityInput) {
+    view.domainPriorityInput.value = "";
+  }
+
+  focusDomainPriorityInput(view);
+}
+
+async function saveSettingsAndRefresh(view) {
+  const { settings, success } = saveSearchPageSettings(state.draftSettings);
+
+  if (!success) {
+    setSettingsFeedback("error", "保存失败，请检查浏览器是否允许本地存储。");
+    syncView(view);
+    return;
+  }
+
+  state.settings = settings;
+  setSettingsFeedback("success", "设置已保存。");
+  closeSettingsDialog(view);
+  await runSearch(view, state.query);
+}
+
 function applyActiveFilter(view, filterId, options = {}) {
   if (state.quickFilters.length === 0) {
     return;
@@ -217,6 +356,43 @@ function setQuickFilterShortcutVisibility(view, isVisible) {
 
 function syncView(view, options = {}) {
   renderPage(view, state, {
+    onOpenSettings() {
+      openSettingsDialog(view);
+    },
+    onCloseSettings() {
+      closeSettingsDialog(view, { restoreFocusToSettingsButton: true });
+    },
+    onResetSettings() {
+      replaceDraftSettings(DEFAULT_SETTINGS);
+      setSettingsFeedback("success", "已恢复默认优先级。");
+      syncView(view);
+      focusDomainPriorityInput(view);
+    },
+    onSaveSettings() {
+      void saveSettingsAndRefresh(view);
+    },
+    onAddDomainPriority() {
+      addDraftDomainPriority(view);
+    },
+    onMoveDomainPriorityUp(index) {
+      moveDraftDomainPriority(index, Math.max(0, index - 1));
+      setSettingsFeedback("", "");
+      syncView(view);
+    },
+    onMoveDomainPriorityDown(index) {
+      moveDraftDomainPriority(
+        index,
+        Math.min(state.draftSettings.domainPriorities.length - 1, index + 1)
+      );
+      setSettingsFeedback("", "");
+      syncView(view);
+    },
+    onRemoveDomainPriority(index) {
+      removeDraftDomainPriority(index);
+      setSettingsFeedback("", "");
+      syncView(view);
+      focusDomainPriorityInput(view);
+    },
     onSelectQuickFilter(filterId) {
       applyActiveFilter(view, filterId, { scrollSelectionIntoView: true });
       focusSearchInput(view, { moveCaretToEnd: true });
@@ -236,7 +412,7 @@ function syncView(view, options = {}) {
 }
 
 function applySearchState(view, rawItems) {
-  Object.assign(state, buildResultState(state.query, rawItems, state.activeFilterId));
+  Object.assign(state, buildResultState(state.query, rawItems, state.activeFilterId, state.settings));
   syncView(view);
 }
 
@@ -372,7 +548,43 @@ function bindEvents(view) {
     void handleSearchInputKeydown(view, event);
   });
 
+  view.settingsButton.addEventListener("click", () => {
+    openSettingsDialog(view);
+  });
+
+  view.settingsCloseButton.addEventListener("click", () => {
+    closeSettingsDialog(view, { restoreFocusToSettingsButton: true });
+  });
+
+  view.settingsSaveButton.addEventListener("click", () => {
+    void saveSettingsAndRefresh(view);
+  });
+
+  view.settingsResetButton.addEventListener("click", () => {
+    replaceDraftSettings(DEFAULT_SETTINGS);
+    setSettingsFeedback("success", "已恢复默认优先级。");
+    syncView(view);
+    focusDomainPriorityInput(view);
+  });
+
+  view.domainPriorityForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    addDraftDomainPriority(view);
+  });
+
+  view.settingsDialog.addEventListener("click", (event) => {
+    if (event.target === view.settingsDialog) {
+      closeSettingsDialog(view, { restoreFocusToSettingsButton: true });
+    }
+  });
+
   window.addEventListener("keydown", (event) => {
+    if (state.settingsDialogOpen && event.key === "Escape") {
+      event.preventDefault();
+      closeSettingsDialog(view, { restoreFocusToSettingsButton: true });
+      return;
+    }
+
     if (event.metaKey || event.altKey) {
       return;
     }
@@ -394,6 +606,11 @@ function bindEvents(view) {
 
   window.addEventListener("focus", () => {
     requestAnimationFrame(() => {
+      if (state.settingsDialogOpen) {
+        focusDomainPriorityInput(view);
+        return;
+      }
+
       focusSearchInput(view, { moveCaretToEnd: true });
     });
   });
@@ -405,6 +622,11 @@ function bindEvents(view) {
     }
 
     requestAnimationFrame(() => {
+      if (state.settingsDialogOpen) {
+        focusDomainPriorityInput(view);
+        return;
+      }
+
       focusSearchInput(view, { moveCaretToEnd: true });
     });
   });
@@ -412,6 +634,8 @@ function bindEvents(view) {
 
 function init() {
   const view = getView();
+  state.settings = loadSearchPageSettings();
+  replaceDraftSettings(state.settings);
   bindEvents(view);
   syncView(view);
   runSearch(view, state.query);

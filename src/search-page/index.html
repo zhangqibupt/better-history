@@ -38,6 +38,9 @@
               />
             </div>
             <button class="search-button" type="submit">搜索历史</button>
+            <button id="settings-button" class="settings-button" type="button" aria-haspopup="dialog" aria-expanded="false">
+              设置
+            </button>
           </div>
           <div class="search-footer">
             <p class="search-footer-copy">输入后即时过滤，按键盘即可完成整个搜索与打开流程。</p>
@@ -66,7 +69,64 @@
             </ul>
           </div>
         </form>
+        <section
+          id="settings-dialog"
+          class="settings-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="设置"
+          hidden
+        >
+          <div class="settings-surface">
+            <div class="settings-header">
+              <h2 class="settings-title">设置</h2>
+              <button id="settings-close-button" class="settings-close-button" type="button" aria-label="关闭设置">
+                ✕
+              </button>
+            </div>
+
+            <div class="settings-body">
+              <section class="settings-section" aria-label="域名优先级">
+                <div class="settings-section-header">
+                  <div class="settings-section-heading">
+                    <h3 class="settings-section-title">域名优先级</h3>
+                    <p class="settings-section-copy">命中的域名分组会按你的顺序显示在前，其余分组保持默认排序。</p>
+                  </div>
+                </div>
+
+                <form id="domain-priority-form" class="settings-form">
+                  <label class="settings-field">
+                    <span class="settings-label">添加域名</span>
+                    <div class="settings-field-row">
+                      <input
+                        id="domain-priority-input"
+                        class="settings-input"
+                        type="text"
+                        inputmode="url"
+                        placeholder="例如 larkoffice.com"
+                        autocomplete="off"
+                        spellcheck="false"
+                      />
+                      <button id="domain-priority-add" class="settings-action-button" type="submit">添加</button>
+                    </div>
+                    <p id="domain-priority-feedback" class="settings-feedback" aria-live="polite"></p>
+                  </label>
+                </form>
+
+                <div class="settings-list-wrap">
+                  <ul id="domain-priority-list" class="settings-list" aria-label="域名优先级列表"></ul>
+                </div>
+              </section>
+            </div>
+
+            <div class="settings-footer">
+              <button id="settings-reset-button" class="settings-secondary-button" type="button">恢复默认</button>
+              <button id="settings-save-button" class="settings-primary-button" type="button">保存</button>
+            </div>
+          </div>
+        </section>
         <section id="quick-filters-panel" class="quick-filters-panel" hidden></section>
+
 
         <section class="results-section" aria-label="浏览历史结果区">
           <div class="results-header">

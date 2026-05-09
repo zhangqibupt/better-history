@@ -15,6 +15,16 @@ function normalizeDomainFilter(domainFilter) {
   return normalizeQuery(domainFilter).replace(/^\.+|\.+$/g, "");
 }
 
+function normalizeDomainPriorities(domainPriorities = []) {
+  if (!Array.isArray(domainPriorities)) {
+    return [];
+  }
+
+  return domainPriorities
+    .map((domain) => normalizeDomainFilter(domain))
+    .filter(Boolean);
+}
+
 export function normalizeUrl(rawUrl) {
   if (!rawUrl) {
     return "";
@@ -303,21 +313,25 @@ function getPromotedGroupThreshold(totalItems) {
   return Math.max(2, Math.min(4, Math.ceil(totalItems * 0.12)));
 }
 
-export function groupHistoryItemsBySite(items) {
+export function groupHistoryItemsBySite(items, options = {}) {
   if (items.length === 0) {
     return [];
   }
 
+  const prioritizedDomains = normalizeDomainPriorities(options.domainPriorities);
   const siteGroups = buildSiteGroups(items).sort(compareHistoryGroups);
   const promotedGroupThreshold = getPromotedGroupThreshold(items.length);
   const promotedGroups = [];
   const otherItems = [];
 
   for (const group of siteGroups) {
+    const isPrioritizedGroup = prioritizedDomains.includes(group.id);
     const shouldPromote =
       group.hostname !== UNKNOWN_HOSTNAME &&
-      group.count >= promotedGroupThreshold &&
-      promotedGroups.length < 3;
+      (
+        isPrioritizedGroup ||
+        (group.count >= promotedGroupThreshold && promotedGroups.length < 3)
+      );
 
     if (shouldPromote) {
       promotedGroups.push(group);
