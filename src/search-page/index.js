@@ -43,7 +43,9 @@ function getView() {
     searchInput: document.querySelector("#search-input"),
     statusCard: document.querySelector("#status-card"),
     quickFiltersPanel: document.querySelector("#quick-filters-panel"),
-    resultsPanel: document.querySelector("#results-panel")
+    resultsPanel: document.querySelector("#results-panel"),
+    resultsTitle: document.querySelector("#results-title"),
+    resultsCountText: document.querySelector("#results-count-text")
   };
 }
 
@@ -203,10 +205,25 @@ function scrollSelectedRowIntoView(view) {
     return;
   }
 
-  selectedRow.scrollIntoView({
-    block: "center",
-    inline: "nearest"
-  });
+  const stickyBottom = view.searchForm?.getBoundingClientRect().bottom ?? 0;
+  const topBoundary = stickyBottom + 20;
+  const bottomBoundary = window.innerHeight - 72;
+  const selectedRect = selectedRow.getBoundingClientRect();
+
+  if (selectedRect.bottom > bottomBoundary) {
+    window.scrollBy({
+      top: selectedRect.bottom - bottomBoundary,
+      behavior: "auto"
+    });
+    return;
+  }
+
+  if (selectedRect.top < topBoundary) {
+    window.scrollBy({
+      top: selectedRect.top - topBoundary,
+      behavior: "auto"
+    });
+  }
 }
 
 async function performOpenResult(view, url, options) {

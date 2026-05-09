@@ -46,6 +46,14 @@ function renderStatus(view, state) {
   view.statusCard.dataset.tone = state.statusTone;
 }
 
+function renderResultsSummary(view, state) {
+  const { keyword, domainFilter } = parseSearchInput(state.query);
+  const hasSearchQuery = Boolean(keyword || domainFilter);
+
+  view.resultsTitle.textContent = hasSearchQuery ? "搜索结果" : "最近访问";
+  view.resultsCountText.textContent = `${state.resultCount} 条`;
+}
+
 function createQuickFilterIcon(filter) {
   if (!filter.representativeItem) {
     const fallbackIcon = createElement("span", "quick-filter-icon quick-filter-icon-all");
@@ -182,6 +190,7 @@ function renderResults(view, state, actions) {
 
 export function renderPage(view, state, actions) {
   renderStatus(view, state);
+  renderResultsSummary(view, state);
   renderQuickFilters(view, state, actions);
   renderResults(view, state, actions);
 }

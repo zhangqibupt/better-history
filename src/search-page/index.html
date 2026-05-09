@@ -9,34 +9,76 @@
   <body>
     <div class="app-shell">
       <header class="page-header">
-        <div>
-          <h1 class="eyebrow">Better History</h1>
+        <p class="page-eyebrow">Browser History</p>
+        <div class="page-title-row">
+          <h1 class="page-title">Better History</h1>
+          <span class="page-badge">Local history</span>
         </div>
+        <p class="page-copy">更快搜索标题、URL、域名与最近访问记录</p>
       </header>
 
       <main class="page-content">
         <form id="search-form" class="search-form">
-          <label class="search-label" for="search-input">搜索标题、URL</label>
-          <div class="search-row">
-            <input
-              id="search-input"
-              class="search-input"
-              type="search"
-              placeholder="搜索标题、URL"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button class="search-button" type="submit">搜索</button>
+          <div class="search-command-bar">
+            <!-- <span class="search-command-prefix" aria-hidden="true">/</span> -->
+            <div class="search-input-wrap">
+              <span class="search-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <circle cx="8.5" cy="8.5" r="4.75"></circle>
+                  <path d="M12 12l4 4"></path>
+                </svg>
+              </span>
+              <input
+                id="search-input"
+                class="search-input"
+                type="search"
+                placeholder="搜索标题、URL、域名…"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <button class="search-button" type="submit">搜索历史</button>
           </div>
-          <p class="search-hint">
-            按住 <kbd>Ctrl</kbd> 可显示筛选数字提示；<kbd>Ctrl</kbd> + 数字键切换站点筛选；<kbd>Enter</kbd>
-            当前页面打开，<kbd>Shift</kbd> + <kbd>Enter</kbd> 新标签页打开。
-          </p>
+          <div class="search-footer">
+            <p class="search-footer-copy">输入后即时过滤，按键盘即可完成整个搜索与打开流程。</p>
+            <ul class="search-hints" aria-label="快捷键提示">
+              <li>
+              <kbd>↑</kbd>
+              <kbd>↓</kbd>
+              <span>选择</span>
+              </li>
+              <li>
+              <kbd>Enter</kbd>
+              <span>直接打开</span>
+              </li>
+              <li>
+              <kbd>Shift</kbd>
+              <span>+</span>
+              <kbd>Enter</kbd>
+              <span>新页面打开</span>
+              </li>
+              <li>
+              <kbd>Ctrl</kbd>
+              <span>+</span>
+              <kbd>数字</kbd>
+              <span>选择筛选项</span>
+              </li>
+            </ul>
+          </div>
         </form>
         <section id="quick-filters-panel" class="quick-filters-panel" hidden></section>
 
         <section id="status-card" class="status-card" aria-live="polite"></section>
-        <section id="results-panel" class="results-panel" aria-live="polite"></section>
+        <section class="results-section" aria-label="浏览历史结果区">
+          <div class="results-header">
+            <div class="results-heading">
+              <h2 id="results-title" class="results-title">最近访问</h2>
+              <p class="results-subtitle">按标题命中、访问频率与最近访问时间排序</p>
+            </div>
+            <span id="results-count-text" class="results-count">0 条</span>
+          </div>
+          <section id="results-panel" class="results-panel" aria-live="polite"></section>
+        </section>
       </main>
     </div>
 
