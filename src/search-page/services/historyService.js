@@ -1,10 +1,33 @@
-import { parseSearchInput } from "../../historySearch.js";
+import { filterExcludedHistoryItems, parseSearchInput } from "../../historySearch.js";
 
 export const DEFAULT_HISTORY_PREFETCH_LIMIT = 50;
 export const PRIMARY_HISTORY_SEARCH_LIMIT = 500;
 export const SUPPLEMENTARY_HISTORY_SEARCH_LIMIT = 1500;
 export const SUPPLEMENTARY_RESULT_THRESHOLD = 20;
 const SUPPLEMENTARY_LOOKBACK_MS = 1000 * 60 * 60 * 24 * 365 * 2;
+const DEBUG_BUILD_TAG = "history-filter-debug-20260510-01";
+
+function publishHistoryDebug(query, rawItems, filteredItems) {
+  const excludedItems = rawItems.filter((item) => !filteredItems.includes(item));
+  const debugPayload = {
+    buildTag: DEBUG_BUILD_TAG,
+    query,
+    rawCount: rawItems.length,
+    filteredCount: filteredItems.length,
+    excludedCount: excludedItems.length,
+    excludedItems: excludedItems.map((item) => ({
+      title: item?.title ?? "",
+      url: item?.url ?? ""
+    })),
+    keptItems: filteredItems.map((item) => ({
+      title: item?.title ?? "",
+      url: item?.url ?? ""
+    }))
+  };
+
+  globalThis.__BETTER_HISTORY_DEBUG__ = debugPayload;
+  console.info("[Better History][debug]", debugPayload);
+}
 
 export function buildDefaultHistoryRequest() {
   return {
@@ -15,9 +38,17 @@ export function buildDefaultHistoryRequest() {
 }
 
 export function buildPrimaryHistorySearchRequest(rawQuery) {
-  const { keyword } = parseSearchInput(rawQuery);
+  const { keywordTokens } = parseSearchInput(rawQuery);
+  const primaryKeyword = keywordTokens.reduce((longestToken, token) => {
+    if (token.length > longestToken.length) {
+      return token;
+    }
+
+    return longestToken;
+  }, "");
+
   return {
-    text: keyword,
+    text: primaryKeyword,
     startTime: 0,
     maxResults: PRIMARY_HISTORY_SEARCH_LIMIT
   };
@@ -32,13 +63,17 @@ export function buildSupplementaryHistorySearchRequest(now = Date.now()) {
 }
 
 export function shouldSupplementHistoryResults(rawQuery, primaryItems) {
-  const { keyword, domainFilter } = parseSearchInput(rawQuery);
+  const { keywordTokens, domainFilter } = parseSearchInput(rawQuery);
 
-  if (!keyword && !domainFilter) {
+  if (keywordTokens.length === 0 && !domainFilter) {
     return false;
   }
 
-  if (!keyword && domainFilter) {
+  if (keywordTokens.length === 0 && domainFilter) {
+    return true;
+  }
+
+  if (keywordTokens.length > 1) {
     return true;
   }
 
@@ -60,10 +95,13 @@ export function mergeHistoryItems(primaryItems, supplementaryItems) {
 }
 
 export async function fetchHistoryItems(rawQuery) {
-  const { keyword, domainFilter } = parseSearchInput(rawQuery);
+  const { keywordTokens, domainFilter } = parseSearchInput(rawQuery);
 
-  if (!keyword && !domainFilter) {
-    return chrome.history.search(buildDefaultHistoryRequest());
+  if (keywordTokens.length === 0 && !domainFilter) {
+    const recentItems = await chrome.history.search(buildDefaultHistoryRequest());
+    const filteredItems = filterExcludedHistoryItems(recentItems);
+    publishHistoryDebug(rawQuery, recentItems, filteredItems);
+    return filteredItems;
   }
 
   const primaryRequest = buildPrimaryHistorySearchRequest(rawQuery);
@@ -72,9 +110,14 @@ export async function fetchHistoryItems(rawQuery) {
     : [];
 
   if (!shouldSupplementHistoryResults(rawQuery, primaryItems)) {
-    return primaryItems;
+    const filteredItems = filterExcludedHistoryItems(primaryItems);
+    publishHistoryDebug(rawQuery, primaryItems, filteredItems);
+    return filteredItems;
   }
 
   const supplementaryItems = await chrome.history.search(buildSupplementaryHistorySearchRequest());
-  return mergeHistoryItems(primaryItems, supplementaryItems);
+  const mergedItems = mergeHistoryItems(primaryItems, supplementaryItems);
+  const filteredItems = filterExcludedHistoryItems(mergedItems);
+  publishHistoryDebug(rawQuery, mergedItems, filteredItems);
+  return filteredItems;
 }

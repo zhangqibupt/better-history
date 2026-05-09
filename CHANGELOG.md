@@ -14,6 +14,15 @@
 ### Changed
 - 移除 `package.json` 中的 `"private": true`，使仓库配置更接近标准公共 npm 项目
 
+### Fixed
+- 避免 `chrome://newtab/`、`chrome://extensions/` 与 `chrome-extension://*` 等浏览器内部页、扩展页污染结果列表
+- 在历史召回返回后立即清洗浏览器内部页与扩展页，避免旧状态继续参与分组与筛选
+- 兼容过滤浏览器历史中以 `extensions`、`extensions?id=...` 等无协议形式返回的内部页记录
+
+### Changed
+- 为历史召回链路增加临时调试输出，可在扩展页 Console 中查看最近一次搜索的原始项、过滤项与当前 debug build 标记
+- 多词搜索默认按空格分词并使用 AND 语义匹配，同时支持逐词高亮；主召回改为优先使用最长 token
+
 ## [1.0.0] - 2026-05-09
 
 ### Added

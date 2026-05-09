@@ -1,34 +1,58 @@
+import { tokenizeKeyword } from "../../historySearch.js";
+
 function appendText(container, value) {
   container.appendChild(document.createTextNode(value));
 }
 
-export function appendHighlightedText(container, value, keyword) {
+export function buildHighlightParts(value, keyword) {
   const text = value ?? "";
-  const normalizedKeyword = (keyword ?? "").trim();
+  const keywordTokens = tokenizeKeyword(keyword).sort((left, right) => right.length - left.length);
 
-  if (!normalizedKeyword) {
-    appendText(container, text);
-    return;
+  if (keywordTokens.length === 0) {
+    return [{ text, highlighted: false }];
   }
 
-  const escapedKeyword = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(escapedKeyword, "gi");
+  const escapedTokens = keywordTokens.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(escapedTokens.join("|"), "gi");
   let lastIndex = 0;
+  const parts = [];
 
   for (const match of text.matchAll(pattern)) {
     const matchIndex = match.index ?? 0;
 
     if (matchIndex > lastIndex) {
-      appendText(container, text.slice(lastIndex, matchIndex));
+      parts.push({
+        text: text.slice(lastIndex, matchIndex),
+        highlighted: false
+      });
     }
 
-    const mark = document.createElement("mark");
-    mark.textContent = match[0];
-    container.appendChild(mark);
+    parts.push({
+      text: match[0],
+      highlighted: true
+    });
     lastIndex = matchIndex + match[0].length;
   }
 
   if (lastIndex < text.length) {
-    appendText(container, text.slice(lastIndex));
+    parts.push({
+      text: text.slice(lastIndex),
+      highlighted: false
+    });
+  }
+
+  return parts;
+}
+
+export function appendHighlightedText(container, value, keyword) {
+  for (const part of buildHighlightParts(value, keyword)) {
+    if (!part.highlighted) {
+      appendText(container, part.text);
+      continue;
+    }
+
+    const mark = document.createElement("mark");
+    mark.textContent = part.text;
+    container.appendChild(mark);
   }
 }

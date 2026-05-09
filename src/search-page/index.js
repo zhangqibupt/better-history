@@ -42,6 +42,7 @@ const state = {
 };
 let searchTimer = null;
 let activeSearchToken = 0;
+const DEBUG_BUILD_TAG = "history-filter-debug-20260510-01";
 
 function getView() {
   return {
@@ -634,6 +635,7 @@ function bindEvents(view) {
 
 function init() {
   const view = getView();
+  globalThis.__BETTER_HISTORY_BUILD__ = DEBUG_BUILD_TAG;
   state.settings = loadSearchPageSettings();
   replaceDraftSettings(state.settings);
   bindEvents(view);

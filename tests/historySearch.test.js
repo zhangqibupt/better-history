@@ -7,7 +7,8 @@ import {
   groupHistoryItemsBySite,
   normalizeUrl,
   parseSearchInput,
-  searchHistoryItems
+  searchHistoryItems,
+  tokenizeKeyword
 } from "../src/historySearch.js";
 import { reorderGroupsByDomainPriority } from "../src/search-page/services/domainPriorityService.js";
 
@@ -21,13 +22,19 @@ test("normalizeUrl removes hash while keeping query parameters", () => {
 test("parseSearchInput extracts keyword and domain filter", () => {
   assert.deepEqual(parseSearchInput("lrm site:larkoffice.com"), {
     keyword: "lrm",
+    keywordTokens: ["lrm"],
     domainFilter: "larkoffice.com"
   });
 
   assert.deepEqual(parseSearchInput("domain:example.com"), {
     keyword: "",
+    keywordTokens: [],
     domainFilter: "example.com"
   });
+});
+
+test("tokenizeKeyword splits multiple terms and removes duplicates", () => {
+  assert.deepEqual(tokenizeKeyword("aa   bb aa"), ["aa", "bb"]);
 });
 
 test("searchHistoryItems matches both title and url case-insensitively", () => {
@@ -53,7 +60,32 @@ test("searchHistoryItems matches both title and url case-insensitively", () => {
   assert.equal(byUrl[0].title, "Unrelated page");
 });
 
-test("searchHistoryItems prefers title matches, then visit count, then recent visits", () => {
+test("searchHistoryItems requires all terms to match across title or url", () => {
+  const items = [
+    {
+      title: "AA project notes",
+      url: "https://example.com/docs/bb",
+      lastVisitTime: 50
+    },
+    {
+      title: "Only aa here",
+      url: "https://example.com/docs/cc",
+      lastVisitTime: 40
+    },
+    {
+      title: "Only bb here",
+      url: "https://example.com/docs/dd",
+      lastVisitTime: 30
+    }
+  ];
+
+  const results = searchHistoryItems(items, "aa bb");
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].url, "https://example.com/docs/bb");
+});
+
+test("searchHistoryItems prefers title matches, then recent visits, then visit count", () => {
   const items = [
     {
       title: "Result from title",
@@ -78,8 +110,8 @@ test("searchHistoryItems prefers title matches, then visit count, then recent vi
   const results = searchHistoryItems(items, "result");
 
   assert.equal(results.length, 3);
-  assert.equal(results[0].url, "https://example.com/docs");
-  assert.equal(results[1].url, "https://example.com/title-new");
+  assert.equal(results[0].url, "https://example.com/title-new");
+  assert.equal(results[1].url, "https://example.com/docs");
   assert.equal(results[2].url, "https://example.com/result-query-ranked");
 });
 
@@ -145,7 +177,7 @@ test("searchHistoryItems supports explicit and UI-driven domain filtering", () =
   assert.equal(byUiFilter.length, 1);
   assert.equal(byUiFilter[0].hostname, "bytedance.larkoffice.com");
   assert.equal(byDomainOnly.length, 2);
-  assert.equal(byDomainOnly[0].url, "https://bytedance.larkoffice.com/doc/1");
+  assert.equal(byDomainOnly[0].url, "https://bytedance.larkoffice.com/doc/2");
 });
 
 test("searchHistoryItems excludes internal doubao history links", () => {
@@ -168,6 +200,66 @@ test("searchHistoryItems excludes internal doubao history links", () => {
 
   assert.equal(results.length, 1);
   assert.equal(results[0].url, "https://bytedance.larkoffice.com/doc/1");
+});
+
+test("searchHistoryItems excludes browser internal pages and extension pages", () => {
+  const items = [
+    {
+      title: "新标签页",
+      url: "chrome://newtab/",
+      visitCount: 20,
+      lastVisitTime: 300
+    },
+    {
+      title: "扩展程序",
+      url: "chrome://extensions/",
+      visitCount: 10,
+      lastVisitTime: 200
+    },
+    {
+      title: "Better History",
+      url: "chrome-extension://abcdefghijklmnop/src/search-page/index.html",
+      visitCount: 8,
+      lastVisitTime: 100
+    },
+    {
+      title: "Project docs",
+      url: "https://example.com/project-docs",
+      visitCount: 3,
+      lastVisitTime: 50
+    }
+  ];
+
+  const results = searchHistoryItems(items, "project");
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].url, "https://example.com/project-docs");
+});
+
+test("searchHistoryItems excludes scheme-less browser internal history urls", () => {
+  const items = [
+    {
+      title: "扩展程序",
+      url: "extensions"
+    },
+    {
+      title: "扩展程序 - Better History",
+      url: "extensions?id=gncjebifeofipkjjekijjkkfgphjkaen"
+    },
+    {
+      title: "新标签页",
+      url: "new-tab-page"
+    },
+    {
+      title: "Project docs",
+      url: "https://example.com/project-docs"
+    }
+  ];
+
+  const results = searchHistoryItems(items, "project");
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].url, "https://example.com/project-docs");
 });
 
 test("groupHistoryItemsBySite promotes frequent hostnames and keeps other results collapsed", () => {
@@ -381,6 +473,56 @@ test("buildDefaultHistoryItems prefers the most recent item over higher visit co
   assert.equal(defaultItems.length, 2);
   assert.equal(defaultItems[0].url, "https://docs.example.com/newer");
   assert.equal(defaultItems[1].url, "https://example.com/reference");
+});
+
+test("buildDefaultHistoryItems excludes browser internal pages and extension pages", () => {
+  const items = [
+    {
+      title: "扩展程序",
+      url: "chrome://extensions/",
+      lastVisitTime: 999
+    },
+    {
+      title: "Better History",
+      url: "chrome-extension://abcdefghijklmnop/src/search-page/index.html",
+      lastVisitTime: 998
+    },
+    {
+      title: "Team wiki",
+      url: "https://example.com/wiki",
+      lastVisitTime: 500
+    }
+  ];
+
+  const defaultItems = buildDefaultHistoryItems(items, 5);
+
+  assert.equal(defaultItems.length, 1);
+  assert.equal(defaultItems[0].url, "https://example.com/wiki");
+});
+
+test("buildDefaultHistoryItems excludes scheme-less browser internal history urls", () => {
+  const items = [
+    {
+      title: "扩展程序",
+      url: "extensions",
+      lastVisitTime: 999
+    },
+    {
+      title: "扩展程序 - Better History",
+      url: "extensions?id=gncjebifeofipkjjekijjkkfgphjkaen",
+      lastVisitTime: 998
+    },
+    {
+      title: "Team wiki",
+      url: "https://example.com/wiki",
+      lastVisitTime: 500
+    }
+  ];
+
+  const defaultItems = buildDefaultHistoryItems(items, 5);
+
+  assert.equal(defaultItems.length, 1);
+  assert.equal(defaultItems[0].url, "https://example.com/wiki");
 });
 
 test("buildDefaultHistoryItems uses the shared default display limit", () => {

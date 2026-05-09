@@ -6,9 +6,31 @@ const OTHER_RESULTS_GROUP_ID = "__other_results__";
 export const ALL_RESULTS_GROUP_ID = "__all_results__";
 const UNKNOWN_HOSTNAME = "(unknown)";
 const EXCLUDED_URL_PREFIXES = ["doubao://history"];
+const EXCLUDED_URL_PROTOCOLS = new Set(["chrome:", "chrome-extension:"]);
+const EXCLUDED_RAW_URL_PREFIXES = [
+  "chrome://",
+  "chrome-extension://"
+];
+const EXCLUDED_SCHEMELESS_PREFIXES = [
+  // Some internal pages can appear as scheme-less strings in history results.
+  "extensions",
+  "newtab",
+  "new-tab-page",
+  "new-tab-page-third-party"
+];
 
 export function normalizeQuery(query) {
   return (query ?? "").trim().toLowerCase();
+}
+
+export function tokenizeKeyword(rawKeyword) {
+  const normalizedKeyword = normalizeQuery(rawKeyword);
+
+  if (!normalizedKeyword) {
+    return [];
+  }
+
+  return Array.from(new Set(normalizedKeyword.split(/\s+/).filter(Boolean)));
 }
 
 function normalizeDomainFilter(domainFilter) {
@@ -52,7 +74,42 @@ export function getHostname(rawUrl) {
 }
 
 function isExcludedHistoryUrl(rawUrl) {
-  return EXCLUDED_URL_PREFIXES.some((prefix) => rawUrl.startsWith(prefix));
+  const normalizedRawUrl = String(rawUrl || "").trim().toLowerCase();
+
+  if (EXCLUDED_URL_PREFIXES.some((prefix) => rawUrl.startsWith(prefix))) {
+    return true;
+  }
+
+  if (EXCLUDED_RAW_URL_PREFIXES.some((prefix) => normalizedRawUrl.startsWith(prefix))) {
+    return true;
+  }
+
+  if (EXCLUDED_SCHEMELESS_PREFIXES.some((prefix) =>
+    normalizedRawUrl === prefix ||
+    normalizedRawUrl.startsWith(`${prefix}?`) ||
+    normalizedRawUrl.startsWith(`${prefix}/`)
+  )) {
+    return true;
+  }
+
+  try {
+    const parsedUrl = new URL(rawUrl);
+    return EXCLUDED_URL_PROTOCOLS.has(parsedUrl.protocol);
+  } catch {
+    return false;
+  }
+}
+
+export function filterExcludedHistoryItems(items) {
+  return items.filter((item) => {
+    const normalizedUrl = normalizeUrl(item?.url);
+
+    if (!normalizedUrl) {
+      return true;
+    }
+
+    return !isExcludedHistoryUrl(normalizedUrl);
+  });
 }
 
 function getPrimaryDomainLabel(hostname) {
@@ -95,13 +152,17 @@ export function parseSearchInput(rawQuery) {
   const normalizedQuery = normalizeQuery(rawQuery);
 
   if (!normalizedQuery) {
-    return { keyword: "", domainFilter: "" };
+    return { keyword: "", keywordTokens: [], domainFilter: "" };
   }
 
   const matchedDomainToken = normalizedQuery.match(/(?:^|\s)(?:site|domain):([^\s]+)/);
   const domainFilter = normalizeDomainFilter(matchedDomainToken?.[1] ?? "");
   const keyword = normalizedQuery.replace(/(?:^|\s)(?:site|domain):([^\s]+)/g, " ").trim();
-  return { keyword, domainFilter };
+  return {
+    keyword,
+    keywordTokens: tokenizeKeyword(keyword),
+    domainFilter
+  };
 }
 
 export function matchesDomain(hostname, domainFilter) {
@@ -114,23 +175,25 @@ export function matchesDomain(hostname, domainFilter) {
   return hostname === normalizedDomainFilter || hostname.endsWith(`.${normalizedDomainFilter}`);
 }
 
-function matchesKeyword(item, normalizedKeyword) {
-  if (!normalizedKeyword) {
+function matchesKeyword(item, keywordTokens) {
+  if (keywordTokens.length === 0) {
     return true;
   }
 
   const title = (item.title ?? "").toLowerCase();
   const url = (item.url ?? "").toLowerCase();
-  return title.includes(normalizedKeyword) || url.includes(normalizedKeyword);
+  return keywordTokens.every((token) => title.includes(token) || url.includes(token));
 }
 
-function getMatchPriority(item, normalizedKeyword) {
-  if (!normalizedKeyword) {
+function getMatchPriority(item, keywordTokens) {
+  if (keywordTokens.length === 0) {
     return NON_TITLE_MATCH_PRIORITY;
   }
 
   const title = (item.title ?? "").toLowerCase();
-  return title.includes(normalizedKeyword) ? TITLE_MATCH_PRIORITY : NON_TITLE_MATCH_PRIORITY;
+  return keywordTokens.every((token) => title.includes(token))
+    ? TITLE_MATCH_PRIORITY
+    : NON_TITLE_MATCH_PRIORITY;
 }
 
 function compareHistoryItems(left, right) {
@@ -142,16 +205,16 @@ function compareHistoryItems(left, right) {
     return matchPriorityDiff;
   }
 
-  const visitCountDiff = (right.visitCount ?? 0) - (left.visitCount ?? 0);
-
-  if (visitCountDiff !== 0) {
-    return visitCountDiff;
-  }
-
   const lastVisitTimeDiff = (right.lastVisitTime ?? 0) - (left.lastVisitTime ?? 0);
 
   if (lastVisitTimeDiff !== 0) {
     return lastVisitTimeDiff;
+  }
+
+  const visitCountDiff = (right.visitCount ?? 0) - (left.visitCount ?? 0);
+
+  if (visitCountDiff !== 0) {
+    return visitCountDiff;
   }
 
   return (left.url ?? "").localeCompare(right.url ?? "");
@@ -204,7 +267,7 @@ function selectRepresentativeItem(currentItem, nextItem, compareItems = compareH
   return compareItems(currentItem, nextItem) <= 0 ? currentItem : nextItem;
 }
 
-function enrichMatchedItem(item, normalizedKeyword) {
+function enrichMatchedItem(item, keywordTokens) {
   const normalizedUrl = normalizeUrl(item.url);
 
   if (!normalizedUrl) {
@@ -223,7 +286,7 @@ function enrichMatchedItem(item, normalizedKeyword) {
     hostname,
     iconGroupKey: getIconGroupKey(hostname),
     iconGroupTitle: getPrimaryDomainLabel(hostname),
-    matchPriority: getMatchPriority(item, normalizedKeyword)
+    matchPriority: getMatchPriority(item, keywordTokens)
   };
 }
 
@@ -269,11 +332,11 @@ function dedupeByDomainAndTitle(items, compareItems = compareHistoryItems) {
   return Array.from(uniqueItems.values());
 }
 
-function enrichAndDedupeItems(items, normalizedKeyword, compareItems = compareHistoryItems) {
+function enrichAndDedupeItems(items, keywordTokens, compareItems = compareHistoryItems) {
   const matchedItems = [];
 
   for (const item of items) {
-    const enrichedItem = enrichMatchedItem(item, normalizedKeyword);
+    const enrichedItem = enrichMatchedItem(item, keywordTokens);
 
     if (!enrichedItem) {
       continue;
@@ -367,27 +430,27 @@ export function groupHistoryItemsBySite(items, options = {}) {
 }
 
 export function buildDefaultHistoryItems(items, limit = DEFAULT_HISTORY_DISPLAY_LIMIT) {
-  return enrichAndDedupeItems(items, "", compareDefaultHistoryItems)
+  return enrichAndDedupeItems(items, [], compareDefaultHistoryItems)
     .sort(compareDefaultHistoryItems)
     .slice(0, limit);
 }
 
 export function searchHistoryItems(items, query, options = {}) {
-  const { keyword, domainFilter } = parseSearchInput(query);
+  const { keywordTokens, domainFilter } = parseSearchInput(query);
   const activeDomainFilter = normalizeDomainFilter(options.domainFilter || domainFilter);
 
-  if (!keyword && !activeDomainFilter) {
+  if (keywordTokens.length === 0 && !activeDomainFilter) {
     return [];
   }
 
   const matchedItems = [];
 
   for (const item of items) {
-    if (!matchesKeyword(item, keyword)) {
+    if (!matchesKeyword(item, keywordTokens)) {
       continue;
     }
 
-    const enrichedItem = enrichMatchedItem(item, keyword);
+    const enrichedItem = enrichMatchedItem(item, keywordTokens);
 
     if (!enrichedItem || !matchesDomain(enrichedItem.hostname, activeDomainFilter)) {
       continue;
