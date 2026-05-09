@@ -3,12 +3,23 @@
   "name": "Better History",
   "version": "1.0.0",
   "description": "Search browsing history from a dedicated extension page with domain grouping and favicon fallback.",
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
   "permissions": ["history", "favicon"],
   "background": {
     "service_worker": "src/background.js",
     "type": "module"
   },
   "action": {
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "32": "assets/icon-32.png",
+      "48": "assets/icon-48.png"
+    },
     "default_title": "Open Better History"
   }
 }

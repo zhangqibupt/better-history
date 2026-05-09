@@ -11,6 +11,6 @@ async function openSearchPage() {
 
 chrome.action.onClicked.addListener(() => {
   openSearchPage().catch((error) => {
-    console.error("Failed to open Better Search Bar page.", { error });
+    console.error("Failed to open Better History page.", { error });
   });
 });

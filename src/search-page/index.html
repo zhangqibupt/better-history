@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Better Search Bar</title>
+    <title>Better History</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="page-header">
         <div>
-          <p class="eyebrow">Better Search Bar</p>
+          <h1 class="eyebrow">Better History</h1>
         </div>
       </header>
 
@@ -22,16 +22,18 @@
               id="search-input"
               class="search-input"
               type="search"
-              placeholder="例如：chrome、lrm、site:larkoffice.com"
+              placeholder="搜索标题、URL"
               autocomplete="off"
               spellcheck="false"
             />
             <button class="search-button" type="submit">搜索</button>
           </div>
           <p class="search-hint">
-            <kbd>Enter</kbd> 直接跳转，<kbd>Shift</kbd> + <kbd>Enter</kbd> 新标签页打开。
+            按住 <kbd>Ctrl</kbd> 可显示筛选数字提示；<kbd>Ctrl</kbd> + 数字键切换站点筛选；<kbd>Enter</kbd>
+            当前页面打开，<kbd>Shift</kbd> + <kbd>Enter</kbd> 新标签页打开。
           </p>
         </form>
+        <section id="quick-filters-panel" class="quick-filters-panel" hidden></section>
 
         <section id="status-card" class="status-card" aria-live="polite"></section>
         <section id="results-panel" class="results-panel" aria-live="polite"></section>

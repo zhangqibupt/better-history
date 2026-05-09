@@ -52,12 +52,12 @@ test("searchHistoryItems matches both title and url case-insensitively", () => {
   assert.equal(byUrl[0].title, "Unrelated page");
 });
 
-test("searchHistoryItems prefers title matches, then recent visits, then visit count", () => {
+test("searchHistoryItems prefers title matches, then visit count, then recent visits", () => {
   const items = [
     {
       title: "Result from title",
       url: "https://example.com/docs",
-      visitCount: 1,
+      visitCount: 6,
       lastVisitTime: 10
     },
     {
@@ -77,8 +77,8 @@ test("searchHistoryItems prefers title matches, then recent visits, then visit c
   const results = searchHistoryItems(items, "result");
 
   assert.equal(results.length, 3);
-  assert.equal(results[0].url, "https://example.com/title-new");
-  assert.equal(results[1].url, "https://example.com/docs");
+  assert.equal(results[0].url, "https://example.com/docs");
+  assert.equal(results[1].url, "https://example.com/title-new");
   assert.equal(results[2].url, "https://example.com/result-query-ranked");
 });
 
@@ -144,7 +144,7 @@ test("searchHistoryItems supports explicit and UI-driven domain filtering", () =
   assert.equal(byUiFilter.length, 1);
   assert.equal(byUiFilter[0].hostname, "bytedance.larkoffice.com");
   assert.equal(byDomainOnly.length, 2);
-  assert.equal(byDomainOnly[0].url, "https://bytedance.larkoffice.com/doc/2");
+  assert.equal(byDomainOnly[0].url, "https://bytedance.larkoffice.com/doc/1");
 });
 
 test("searchHistoryItems excludes internal doubao history links", () => {
@@ -259,7 +259,7 @@ test("groupHistoryItemsBySite falls back to a single all-results group when no s
   assert.equal(groups[0].count, 3);
 });
 
-test("buildDefaultHistoryItems returns recent items, filters invalid entries and respects limit", () => {
+test("buildDefaultHistoryItems keeps latest unique items and sorts by last visit time", () => {
   const items = [
     {
       title: "历史记录",
@@ -274,11 +274,13 @@ test("buildDefaultHistoryItems returns recent items, filters invalid entries and
     {
       title: "Shared title",
       url: "https://docs.example.com/a",
+      visitCount: 9,
       lastVisitTime: 700
     },
     {
       title: "Shared title",
       url: "https://docs.example.com/b",
+      visitCount: 1,
       lastVisitTime: 800
     },
     {
@@ -293,6 +295,35 @@ test("buildDefaultHistoryItems returns recent items, filters invalid entries and
   assert.equal(defaultItems.length, 2);
   assert.equal(defaultItems[0].title, "Keep newest");
   assert.equal(defaultItems[1].url, "https://docs.example.com/b");
+});
+
+test("buildDefaultHistoryItems prefers the most recent item over higher visit count", () => {
+  const items = [
+    {
+      title: "Weekly doc",
+      url: "https://docs.example.com/older",
+      visitCount: 20,
+      lastVisitTime: 100
+    },
+    {
+      title: "Weekly doc",
+      url: "https://docs.example.com/newer",
+      visitCount: 1,
+      lastVisitTime: 300
+    },
+    {
+      title: "Reference",
+      url: "https://example.com/reference",
+      visitCount: 3,
+      lastVisitTime: 200
+    }
+  ];
+
+  const defaultItems = buildDefaultHistoryItems(items, 3);
+
+  assert.equal(defaultItems.length, 2);
+  assert.equal(defaultItems[0].url, "https://docs.example.com/newer");
+  assert.equal(defaultItems[1].url, "https://example.com/reference");
 });
 
 test("buildDefaultHistoryItems uses the shared default display limit", () => {

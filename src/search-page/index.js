@@ -1,5 +1,6 @@
 import {
   buildDefaultHistoryItems,
+  ALL_RESULTS_GROUP_ID,
   groupHistoryItemsBySite,
   parseSearchInput,
   searchHistoryItems
@@ -9,6 +10,12 @@ import { renderPage } from "./render.js";
 import { fetchHistoryItems } from "./services/historyService.js";
 import { openHistoryResult } from "./services/navigationService.js";
 import {
+  buildQuickFilters,
+  filterGroupsByActiveFilterId,
+  getQuickFilterByShortcut,
+  resolveActiveQuickFilterId
+} from "./services/quickFilterService.js";
+import {
   NO_SELECTION,
   getDefaultSelectionIndex,
   moveSelectionIndex
@@ -17,7 +24,11 @@ import {
 const state = {
   query: "",
   visibleItems: [],
+  allGroups: [],
   visibleGroups: [],
+  quickFilters: [],
+  showQuickFilterShortcuts: false,
+  activeFilterId: "",
   statusMessage: INITIAL_STATUS,
   statusTone: "default",
   resultCount: 0,
@@ -31,6 +42,7 @@ function getView() {
     searchForm: document.querySelector("#search-form"),
     searchInput: document.querySelector("#search-input"),
     statusCard: document.querySelector("#status-card"),
+    quickFiltersPanel: document.querySelector("#quick-filters-panel"),
     resultsPanel: document.querySelector("#results-panel")
   };
 }
@@ -45,23 +57,94 @@ function buildEmptyStateMessage(query) {
   return "没有找到匹配的历史记录，试试缩短关键词。";
 }
 
-function buildResultState(query, rawItems) {
+function getVisibleItemCount(groups) {
+  return groups.reduce((count, group) => count + group.items.length, 0);
+}
+
+function buildStatusMessage(totalCount, visibleCount, activeFilterId, quickFilters, prefix) {
+  if (!activeFilterId || activeFilterId === ALL_RESULTS_GROUP_ID) {
+    return prefix(totalCount);
+  }
+
+  const activeFilter = quickFilters.find((filter) => filter.id === activeFilterId);
+
+  if (!activeFilter) {
+    return prefix(totalCount);
+  }
+
+  return `${prefix(totalCount)} 当前筛选：${activeFilter.title}，显示 ${visibleCount} 条。`;
+}
+
+function buildGroupedState(items, groups, previousFilterId, statusTone, buildBaseMessage) {
+  const quickFilters = buildQuickFilters(groups, items);
+  const activeFilterId = resolveActiveQuickFilterId(previousFilterId, quickFilters);
+  const visibleGroups = filterGroupsByActiveFilterId(groups, activeFilterId);
+  const visibleItemCount = getVisibleItemCount(visibleGroups);
+
+  return {
+    visibleItems: items,
+    allGroups: groups,
+    visibleGroups,
+    quickFilters,
+    activeFilterId,
+    statusMessage: buildStatusMessage(items.length, visibleItemCount, activeFilterId, quickFilters, buildBaseMessage),
+    statusTone,
+    resultCount: visibleItemCount,
+    selectedIndex: getDefaultSelectionIndex(visibleItemCount)
+  };
+}
+
+function buildUngroupedState(items, statusTone, statusMessage) {
+  const visibleGroups = items.length === 0
+    ? []
+    : [
+        {
+          id: ALL_RESULTS_GROUP_ID,
+          title: "全部结果",
+          hostname: "",
+          count: items.length,
+          items
+        }
+      ];
+
+  return {
+    visibleItems: items,
+    allGroups: visibleGroups,
+    visibleGroups,
+    quickFilters: [],
+    activeFilterId: "",
+    statusMessage,
+    statusTone,
+    resultCount: items.length,
+    selectedIndex: getDefaultSelectionIndex(items.length)
+  };
+}
+
+function buildResultState(query, rawItems, previousFilterId = "") {
   const { keyword, domainFilter } = parseSearchInput(query);
 
   if (!keyword && !domainFilter) {
     const defaultItems = buildDefaultHistoryItems(rawItems);
 
-    return {
-      visibleItems: defaultItems,
-      visibleGroups: defaultItems.length > 0 ? groupHistoryItemsBySite(defaultItems) : [],
-      statusMessage:
-        defaultItems.length > 0
-          ? `最近访问的 ${defaultItems.length} 条记录，已按相似图标来源自动聚集排序。`
-          : INITIAL_STATUS,
-      statusTone: "default",
-      resultCount: defaultItems.length,
-      selectedIndex: getDefaultSelectionIndex(defaultItems.length)
-    };
+    if (defaultItems.length === 0) {
+      return {
+        visibleItems: [],
+        allGroups: [],
+        visibleGroups: [],
+        quickFilters: [],
+        activeFilterId: "",
+        statusMessage: INITIAL_STATUS,
+        statusTone: "default",
+        resultCount: 0,
+        selectedIndex: NO_SELECTION
+      };
+    }
+
+    return buildUngroupedState(
+      defaultItems,
+      "default",
+      `最近访问的 ${defaultItems.length} 条记录，已按上次访问时间排序。`
+    );
   }
 
   const visibleItems = searchHistoryItems(rawItems, query);
@@ -69,7 +152,10 @@ function buildResultState(query, rawItems) {
   if (visibleItems.length === 0) {
     return {
       visibleItems,
+      allGroups: [],
       visibleGroups: [],
+      quickFilters: [],
+      activeFilterId: "",
       statusMessage: buildEmptyStateMessage(query),
       statusTone: "default",
       resultCount: 0,
@@ -77,20 +163,13 @@ function buildResultState(query, rawItems) {
     };
   }
 
-  const visibleGroups = groupHistoryItemsBySite(visibleItems);
-  const statusMessage =
-    visibleGroups.length > 1
-      ? `找到 ${visibleItems.length} 条结果。`
-      : `找到 ${visibleItems.length} 条结果。`;
-
-  return {
+  return buildGroupedState(
     visibleItems,
-    visibleGroups,
-    statusMessage,
-    statusTone: "success",
-    resultCount: visibleItems.length,
-    selectedIndex: getDefaultSelectionIndex(visibleItems.length)
-  };
+    groupHistoryItemsBySite(visibleItems),
+    previousFilterId,
+    "success",
+    (count) => `找到 ${count} 条结果。`
+  );
 }
 
 function getRenderedItems() {
@@ -141,8 +220,49 @@ async function performOpenResult(view, url, options) {
   }
 }
 
+function applyActiveFilter(view, filterId, options = {}) {
+  if (state.quickFilters.length === 0) {
+    return;
+  }
+
+  const nextFilterId = resolveActiveQuickFilterId(filterId, state.quickFilters);
+
+  if (!nextFilterId) {
+    return;
+  }
+
+  state.activeFilterId = nextFilterId;
+  state.visibleGroups = filterGroupsByActiveFilterId(state.allGroups, nextFilterId);
+  state.resultCount = getVisibleItemCount(state.visibleGroups);
+  state.selectedIndex = getDefaultSelectionIndex(state.resultCount);
+  state.statusMessage = buildStatusMessage(
+    state.visibleItems.length,
+    state.resultCount,
+    state.activeFilterId,
+    state.quickFilters,
+    (count) =>
+      state.statusTone === "success"
+        ? `找到 ${count} 条结果。`
+        : `最近访问的 ${count} 条记录，已按上次访问时间排序。`
+  );
+  syncView(view, options);
+}
+
+function setQuickFilterShortcutVisibility(view, isVisible) {
+  if (state.showQuickFilterShortcuts === isVisible) {
+    return;
+  }
+
+  state.showQuickFilterShortcuts = isVisible;
+  syncView(view);
+}
+
 function syncView(view, options = {}) {
   renderPage(view, state, {
+    onSelectQuickFilter(filterId) {
+      applyActiveFilter(view, filterId, { scrollSelectionIntoView: true });
+      focusSearchInput(view, { moveCaretToEnd: true });
+    },
     async onOpenResult(index, url) {
       state.selectedIndex = index;
       syncView(view);
@@ -158,13 +278,12 @@ function syncView(view, options = {}) {
 }
 
 function applySearchState(view, rawItems) {
-  Object.assign(state, buildResultState(state.query, rawItems));
+  Object.assign(state, buildResultState(state.query, rawItems, state.activeFilterId));
   syncView(view);
 }
 
 async function runSearch(view, query) {
   const searchToken = ++activeSearchToken;
-  const { keyword, domainFilter } = parseSearchInput(query);
 
   state.statusMessage = LOADING_STATUS;
   state.statusTone = "default";
@@ -189,7 +308,10 @@ async function runSearch(view, query) {
     state.statusMessage = SEARCH_ERROR_STATUS;
     state.statusTone = "error";
     state.visibleItems = [];
+    state.allGroups = [];
     state.visibleGroups = [];
+    state.quickFilters = [];
+    state.activeFilterId = "";
     state.resultCount = 0;
     state.selectedIndex = NO_SELECTION;
     syncView(view);
@@ -225,7 +347,21 @@ async function flushPendingSearch(view) {
 }
 
 async function handleSearchInputKeydown(view, event) {
-  if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) {
+  if (event.isComposing || event.metaKey) {
+    return;
+  }
+
+  const quickFilter = event.ctrlKey && !event.altKey
+    ? getQuickFilterByShortcut(state.quickFilters, event.key)
+    : null;
+
+  if (quickFilter) {
+    event.preventDefault();
+    applyActiveFilter(view, quickFilter.id, { scrollSelectionIntoView: true });
+    return;
+  }
+
+  if (event.altKey || event.ctrlKey) {
     return;
   }
 
@@ -282,6 +418,26 @@ function bindEvents(view) {
     void handleSearchInputKeydown(view, event);
   });
 
+  window.addEventListener("keydown", (event) => {
+    if (event.metaKey || event.altKey) {
+      return;
+    }
+
+    if (event.key === "Control" || event.ctrlKey) {
+      setQuickFilterShortcutVisibility(view, true);
+    }
+  });
+
+  window.addEventListener("keyup", (event) => {
+    if (event.key === "Control" || !event.ctrlKey) {
+      setQuickFilterShortcutVisibility(view, false);
+    }
+  });
+
+  window.addEventListener("blur", () => {
+    setQuickFilterShortcutVisibility(view, false);
+  });
+
   window.addEventListener("focus", () => {
     requestAnimationFrame(() => {
       focusSearchInput(view, { moveCaretToEnd: true });
@@ -290,6 +446,7 @@ function bindEvents(view) {
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") {
+      setQuickFilterShortcutVisibility(view, false);
       return;
     }
 

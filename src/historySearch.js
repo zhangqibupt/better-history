@@ -3,7 +3,7 @@ export const DEFAULT_HISTORY_DISPLAY_LIMIT = 20;
 const TITLE_MATCH_PRIORITY = 0;
 const NON_TITLE_MATCH_PRIORITY = 1;
 const OTHER_RESULTS_GROUP_ID = "__other_results__";
-const ALL_RESULTS_GROUP_ID = "__all_results__";
+export const ALL_RESULTS_GROUP_ID = "__all_results__";
 const UNKNOWN_HOSTNAME = "(unknown)";
 const EXCLUDED_URL_PREFIXES = ["doubao://history"];
 
@@ -132,6 +132,22 @@ function compareHistoryItems(left, right) {
     return matchPriorityDiff;
   }
 
+  const visitCountDiff = (right.visitCount ?? 0) - (left.visitCount ?? 0);
+
+  if (visitCountDiff !== 0) {
+    return visitCountDiff;
+  }
+
+  const lastVisitTimeDiff = (right.lastVisitTime ?? 0) - (left.lastVisitTime ?? 0);
+
+  if (lastVisitTimeDiff !== 0) {
+    return lastVisitTimeDiff;
+  }
+
+  return (left.url ?? "").localeCompare(right.url ?? "");
+}
+
+function compareDefaultHistoryItems(left, right) {
   const lastVisitTimeDiff = (right.lastVisitTime ?? 0) - (left.lastVisitTime ?? 0);
 
   if (lastVisitTimeDiff !== 0) {
@@ -174,8 +190,8 @@ function compareHistoryGroups(left, right) {
   return compareHistoryItems(leftScore.topItem, rightScore.topItem);
 }
 
-function selectRepresentativeItem(currentItem, nextItem) {
-  return compareHistoryItems(currentItem, nextItem) <= 0 ? currentItem : nextItem;
+function selectRepresentativeItem(currentItem, nextItem, compareItems = compareHistoryItems) {
+  return compareItems(currentItem, nextItem) <= 0 ? currentItem : nextItem;
 }
 
 function enrichMatchedItem(item, normalizedKeyword) {
@@ -201,7 +217,7 @@ function enrichMatchedItem(item, normalizedKeyword) {
   };
 }
 
-function dedupeByNormalizedUrl(items) {
+function dedupeByNormalizedUrl(items, compareItems = compareHistoryItems) {
   const uniqueItems = new Map();
 
   for (const item of items) {
@@ -212,13 +228,13 @@ function dedupeByNormalizedUrl(items) {
       continue;
     }
 
-    uniqueItems.set(item.url, selectRepresentativeItem(existingItem, item));
+    uniqueItems.set(item.url, selectRepresentativeItem(existingItem, item, compareItems));
   }
 
   return Array.from(uniqueItems.values());
 }
 
-function dedupeByDomainAndTitle(items) {
+function dedupeByDomainAndTitle(items, compareItems = compareHistoryItems) {
   const uniqueItems = new Map();
 
   for (const item of items) {
@@ -237,13 +253,13 @@ function dedupeByDomainAndTitle(items) {
       continue;
     }
 
-    uniqueItems.set(dedupeKey, selectRepresentativeItem(existingItem, item));
+    uniqueItems.set(dedupeKey, selectRepresentativeItem(existingItem, item, compareItems));
   }
 
   return Array.from(uniqueItems.values());
 }
 
-function enrichAndDedupeItems(items, normalizedKeyword) {
+function enrichAndDedupeItems(items, normalizedKeyword, compareItems = compareHistoryItems) {
   const matchedItems = [];
 
   for (const item of items) {
@@ -256,8 +272,8 @@ function enrichAndDedupeItems(items, normalizedKeyword) {
     matchedItems.push(enrichedItem);
   }
 
-  const dedupedByUrl = dedupeByNormalizedUrl(matchedItems);
-  return dedupeByDomainAndTitle(dedupedByUrl);
+  const dedupedByUrl = dedupeByNormalizedUrl(matchedItems, compareItems);
+  return dedupeByDomainAndTitle(dedupedByUrl, compareItems);
 }
 
 function buildSiteGroups(items) {
@@ -337,13 +353,9 @@ export function groupHistoryItemsBySite(items) {
 }
 
 export function buildDefaultHistoryItems(items, limit = DEFAULT_HISTORY_DISPLAY_LIMIT) {
-  const preparedItems = enrichAndDedupeItems(items, "").sort(compareHistoryItems).slice(0, limit);
-
-  if (preparedItems.length === 0) {
-    return [];
-  }
-
-  return groupHistoryItemsBySite(preparedItems).flatMap((group) => group.items);
+  return enrichAndDedupeItems(items, "", compareDefaultHistoryItems)
+    .sort(compareDefaultHistoryItems)
+    .slice(0, limit);
 }
 
 export function searchHistoryItems(items, query, options = {}) {
@@ -370,6 +382,9 @@ export function searchHistoryItems(items, query, options = {}) {
     matchedItems.push(enrichedItem);
   }
 
-  const dedupedByDomainAndTitle = dedupeByDomainAndTitle(dedupeByNormalizedUrl(matchedItems));
+  const dedupedByDomainAndTitle = dedupeByDomainAndTitle(
+    dedupeByNormalizedUrl(matchedItems, compareHistoryItems),
+    compareHistoryItems
+  );
   return dedupedByDomainAndTitle.sort(compareHistoryItems);
 }
