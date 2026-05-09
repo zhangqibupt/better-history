@@ -114,11 +114,10 @@ button {
 
 .page-content {
   display: grid;
-  gap: 12px;
+  gap: 5px;
 }
 
 .search-form,
-.status-card,
 .results-section {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -130,7 +129,7 @@ button {
   position: sticky;
   top: 12px;
   z-index: 20;
-  padding: 14px;
+  padding: 10px 14px 10px 14px;
   background: var(--bg-surface-strong);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow-sticky);
@@ -298,10 +297,10 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  /* gap: 12px; */
   margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
+  /* padding-top: 12px; */
+  /* border-top: 1px solid var(--border-subtle); */
 }
 
 .search-footer-copy {
@@ -454,26 +453,6 @@ button {
   transform: scale(1);
 }
 
-.status-card {
-  padding: 11px 14px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.5;
-  background: rgba(249, 250, 251, 0.9);
-}
-
-.status-card[data-tone="success"] {
-  border-color: rgba(79, 70, 229, 0.14);
-  background: rgba(245, 243, 255, 0.88);
-  color: var(--text-primary);
-}
-
-.status-card[data-tone="error"] {
-  border-color: rgba(239, 68, 68, 0.2);
-  background: rgba(254, 242, 242, 0.95);
-  color: #991b1b;
-}
-
 .results-section {
   overflow: hidden;
 }
@@ -530,7 +509,7 @@ button {
   align-items: center;
   gap: 12px;
   width: 100%;
-  min-height: 44px;
+  min-height: 34px;
   padding: 10px 14px;
   background: transparent;
   text-align: left;
@@ -574,7 +553,7 @@ button {
 .result-title {
   min-width: 0;
   font-size: 14px;
-  font-weight: 520;
+  font-weight: 420;
   line-height: 1.35;
   color: var(--text-primary);
   white-space: nowrap;

@@ -5,7 +5,6 @@ import {
   parseSearchInput,
   searchHistoryItems
 } from "../historySearch.js";
-import { INITIAL_STATUS, LOADING_STATUS, SEARCH_ERROR_STATUS } from "./constants.js";
 import { renderPage } from "./render.js";
 import { fetchHistoryItems } from "./services/historyService.js";
 import { openHistoryResult } from "./services/navigationService.js";
@@ -29,8 +28,6 @@ const state = {
   quickFilters: [],
   showQuickFilterShortcuts: false,
   activeFilterId: "",
-  statusMessage: INITIAL_STATUS,
-  statusTone: "default",
   resultCount: 0,
   selectedIndex: NO_SELECTION
 };
@@ -41,7 +38,6 @@ function getView() {
   return {
     searchForm: document.querySelector("#search-form"),
     searchInput: document.querySelector("#search-input"),
-    statusCard: document.querySelector("#status-card"),
     quickFiltersPanel: document.querySelector("#quick-filters-panel"),
     resultsPanel: document.querySelector("#results-panel"),
     resultsTitle: document.querySelector("#results-title"),
@@ -49,35 +45,11 @@ function getView() {
   };
 }
 
-function buildEmptyStateMessage(query) {
-  const { keyword, domainFilter } = parseSearchInput(query);
-
-  if (!keyword && !domainFilter) {
-    return INITIAL_STATUS;
-  }
-
-  return "没有找到匹配的历史记录，试试缩短关键词。";
-}
-
 function getVisibleItemCount(groups) {
   return groups.reduce((count, group) => count + group.items.length, 0);
 }
 
-function buildStatusMessage(totalCount, visibleCount, activeFilterId, quickFilters, prefix) {
-  if (!activeFilterId || activeFilterId === ALL_RESULTS_GROUP_ID) {
-    return prefix(totalCount);
-  }
-
-  const activeFilter = quickFilters.find((filter) => filter.id === activeFilterId);
-
-  if (!activeFilter) {
-    return prefix(totalCount);
-  }
-
-  return `${prefix(totalCount)} 当前筛选：${activeFilter.title}，显示 ${visibleCount} 条。`;
-}
-
-function buildGroupedState(items, groups, previousFilterId, statusTone, buildBaseMessage) {
+function buildGroupedState(items, groups, previousFilterId) {
   const quickFilters = buildQuickFilters(groups, items);
   const activeFilterId = resolveActiveQuickFilterId(previousFilterId, quickFilters);
   const visibleGroups = filterGroupsByActiveFilterId(groups, activeFilterId);
@@ -89,14 +61,12 @@ function buildGroupedState(items, groups, previousFilterId, statusTone, buildBas
     visibleGroups,
     quickFilters,
     activeFilterId,
-    statusMessage: buildStatusMessage(items.length, visibleItemCount, activeFilterId, quickFilters, buildBaseMessage),
-    statusTone,
     resultCount: visibleItemCount,
     selectedIndex: getDefaultSelectionIndex(visibleItemCount)
   };
 }
 
-function buildUngroupedState(items, statusTone, statusMessage) {
+function buildUngroupedState(items) {
   const visibleGroups = items.length === 0
     ? []
     : [
@@ -115,8 +85,6 @@ function buildUngroupedState(items, statusTone, statusMessage) {
     visibleGroups,
     quickFilters: [],
     activeFilterId: "",
-    statusMessage,
-    statusTone,
     resultCount: items.length,
     selectedIndex: getDefaultSelectionIndex(items.length)
   };
@@ -135,18 +103,12 @@ function buildResultState(query, rawItems, previousFilterId = "") {
         visibleGroups: [],
         quickFilters: [],
         activeFilterId: "",
-        statusMessage: INITIAL_STATUS,
-        statusTone: "default",
         resultCount: 0,
         selectedIndex: NO_SELECTION
       };
     }
 
-    return buildUngroupedState(
-      defaultItems,
-      "default",
-      `最近访问的 ${defaultItems.length} 条记录，已按上次访问时间排序。`
-    );
+    return buildUngroupedState(defaultItems);
   }
 
   const visibleItems = searchHistoryItems(rawItems, query);
@@ -158,20 +120,12 @@ function buildResultState(query, rawItems, previousFilterId = "") {
       visibleGroups: [],
       quickFilters: [],
       activeFilterId: "",
-      statusMessage: buildEmptyStateMessage(query),
-      statusTone: "default",
       resultCount: 0,
       selectedIndex: NO_SELECTION
     };
   }
 
-  return buildGroupedState(
-    visibleItems,
-    groupHistoryItemsBySite(visibleItems),
-    previousFilterId,
-    "success",
-    (count) => `找到 ${count} 条结果。`
-  );
+  return buildGroupedState(visibleItems, groupHistoryItemsBySite(visibleItems), previousFilterId);
 }
 
 function getRenderedItems() {
@@ -226,14 +180,11 @@ function scrollSelectedRowIntoView(view) {
   }
 }
 
-async function performOpenResult(view, url, options) {
+async function performOpenResult(url, options) {
   try {
     await openHistoryResult(url, options);
   } catch (error) {
     console.error("Failed to open history result.", { url, error, options });
-    state.statusMessage = "打开页面失败，请稍后重试。";
-    state.statusTone = "error";
-    syncView(view);
   }
 }
 
@@ -252,16 +203,6 @@ function applyActiveFilter(view, filterId, options = {}) {
   state.visibleGroups = filterGroupsByActiveFilterId(state.allGroups, nextFilterId);
   state.resultCount = getVisibleItemCount(state.visibleGroups);
   state.selectedIndex = getDefaultSelectionIndex(state.resultCount);
-  state.statusMessage = buildStatusMessage(
-    state.visibleItems.length,
-    state.resultCount,
-    state.activeFilterId,
-    state.quickFilters,
-    (count) =>
-      state.statusTone === "success"
-        ? `找到 ${count} 条结果。`
-        : `最近访问的 ${count} 条记录，已按上次访问时间排序。`
-  );
   syncView(view, options);
 }
 
@@ -283,7 +224,7 @@ function syncView(view, options = {}) {
     async onOpenResult(index, url) {
       state.selectedIndex = index;
       syncView(view);
-      await performOpenResult(view, url, { openInNewTab: true });
+      await performOpenResult(url, { openInNewTab: true });
     }
   });
 
@@ -302,8 +243,6 @@ function applySearchState(view, rawItems) {
 async function runSearch(view, query) {
   const searchToken = ++activeSearchToken;
 
-  state.statusMessage = LOADING_STATUS;
-  state.statusTone = "default";
   state.resultCount = 0;
   state.selectedIndex = NO_SELECTION;
   syncView(view);
@@ -322,8 +261,6 @@ async function runSearch(view, query) {
     }
 
     console.error("Failed to load browsing history.", { error });
-    state.statusMessage = SEARCH_ERROR_STATUS;
-    state.statusTone = "error";
     state.visibleItems = [];
     state.allGroups = [];
     state.visibleGroups = [];
@@ -416,7 +353,7 @@ async function handleSearchInputKeydown(view, event) {
     return;
   }
 
-  await performOpenResult(view, selectedItem.url, { openInNewTab: event.shiftKey });
+  await performOpenResult(selectedItem.url, { openInNewTab: event.shiftKey });
 }
 
 function bindEvents(view) {

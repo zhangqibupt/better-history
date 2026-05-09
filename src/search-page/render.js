@@ -41,11 +41,6 @@ function applyFavicon(image, item) {
   );
 }
 
-function renderStatus(view, state) {
-  view.statusCard.textContent = state.statusMessage;
-  view.statusCard.dataset.tone = state.statusTone;
-}
-
 function renderResultsSummary(view, state) {
   const { keyword, domainFilter } = parseSearchInput(state.query);
   const hasSearchQuery = Boolean(keyword || domainFilter);
@@ -189,7 +184,6 @@ function renderResults(view, state, actions) {
 }
 
 export function renderPage(view, state, actions) {
-  renderStatus(view, state);
   renderResultsSummary(view, state);
   renderQuickFilters(view, state, actions);
   renderResults(view, state, actions);
